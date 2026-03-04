@@ -1,0 +1,575 @@
+{
+	"actions": [],
+	"allow_rename": 0,
+	"autoname": "EBAY-ORD-.#####",
+	"creation": "2024-05-22 12:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"order_info_section",
+		"sales_order",
+		"ebay_order_number",
+		"sales_record_number",
+		"transaction_id",
+		"column_break_order",
+		"sale_date",
+		"paid_on_date",
+		"ship_by_date",
+		"shipped_on_date",
+		"buyer_section",
+		"buyer_username",
+		"buyer_name",
+		"buyer_email",
+		"buyer_note",
+		"column_break_buyer",
+		"buyer_tax_id_name",
+		"buyer_tax_id_value",
+		"item_section",
+		"item_number",
+		"item_title",
+		"custom_label",
+		"variation_details",
+		"column_break_item",
+		"item_location",
+		"item_zip",
+		"item_country",
+		"sold_via_promoted",
+		"shipping_section",
+		"tracking_number",
+		"shipping_service",
+		"column_break_shipping",
+		"min_delivery_date",
+		"max_delivery_date",
+		"payment_section",
+		"payment_method",
+		"paypal_transaction_id",
+		"tax_section",
+		"tax_status",
+		"tax_rate",
+		"tax_type",
+		"tax_included_in_total",
+		"column_break_tax",
+		"tax_city",
+		"tax_state",
+		"tax_zip",
+		"tax_country",
+		"fees_section",
+		"ebay_collected_tax",
+		"seller_collected_tax",
+		"ebay_charges",
+		"column_break_fees1",
+		"ewaste_fee",
+		"mattress_fee",
+		"battery_fee",
+		"white_goods_fee",
+		"tire_fee",
+		"column_break_fees2",
+		"additional_fee",
+		"lumber_fee",
+		"wireless_fee",
+		"road_fee",
+		"programs_section",
+		"global_shipping_program",
+		"global_shipping_ref_id",
+		"ebay_international_shipping",
+		"column_break_programs1",
+		"click_and_collect",
+		"click_collect_ref",
+		"ebay_plus",
+		"column_break_programs2",
+		"ebay_fulfillment_program",
+		"authenticity_verification",
+		"auth_verification_status",
+		"auth_verification_reason",
+		"column_break_programs3",
+		"psa_vault_program",
+		"vault_fulfillment_type",
+		"feedback_section",
+		"feedback_left",
+		"feedback_received",
+		"my_item_note",
+		"reference_section",
+		"ebay_reference_name",
+		"ebay_reference_value"
+	],
+	"fields": [
+		{
+			"fieldname": "order_info_section",
+			"fieldtype": "Section Break",
+			"label": "Order Information"
+		},
+		{
+			"fieldname": "sales_order",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Sales Order",
+			"options": "Sales Order",
+			"reqd": 1
+		},
+		{
+			"fieldname": "ebay_order_number",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "eBay Order Number",
+			"unique": 1
+		},
+		{
+			"fieldname": "sales_record_number",
+			"fieldtype": "Data",
+			"label": "Sales Record Number"
+		},
+		{
+			"fieldname": "transaction_id",
+			"fieldtype": "Data",
+			"label": "Transaction ID"
+		},
+		{
+			"fieldname": "column_break_order",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "sale_date",
+			"fieldtype": "Date",
+			"label": "Sale Date"
+		},
+		{
+			"fieldname": "paid_on_date",
+			"fieldtype": "Date",
+			"label": "Paid On Date"
+		},
+		{
+			"fieldname": "ship_by_date",
+			"fieldtype": "Date",
+			"label": "Ship By Date"
+		},
+		{
+			"fieldname": "shipped_on_date",
+			"fieldtype": "Date",
+			"label": "Shipped On Date"
+		},
+		{
+			"fieldname": "buyer_section",
+			"fieldtype": "Section Break",
+			"label": "Buyer Information"
+		},
+		{
+			"fieldname": "buyer_username",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Buyer Username"
+		},
+		{
+			"fieldname": "buyer_name",
+			"fieldtype": "Data",
+			"label": "Buyer Name"
+		},
+		{
+			"fieldname": "buyer_email",
+			"fieldtype": "Data",
+			"label": "Buyer Email",
+			"options": "Email"
+		},
+		{
+			"fieldname": "buyer_note",
+			"fieldtype": "Small Text",
+			"label": "Buyer Note"
+		},
+		{
+			"fieldname": "column_break_buyer",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "buyer_tax_id_name",
+			"fieldtype": "Data",
+			"label": "Tax ID Type"
+		},
+		{
+			"fieldname": "buyer_tax_id_value",
+			"fieldtype": "Data",
+			"label": "Tax ID Value"
+		},
+		{
+			"fieldname": "item_section",
+			"fieldtype": "Section Break",
+			"label": "Item Information"
+		},
+		{
+			"fieldname": "item_number",
+			"fieldtype": "Data",
+			"label": "eBay Item Number"
+		},
+		{
+			"fieldname": "item_title",
+			"fieldtype": "Data",
+			"label": "Item Title"
+		},
+		{
+			"fieldname": "custom_label",
+			"fieldtype": "Data",
+			"label": "Custom Label (SKU)"
+		},
+		{
+			"fieldname": "variation_details",
+			"fieldtype": "Small Text",
+			"label": "Variation Details"
+		},
+		{
+			"fieldname": "column_break_item",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "item_location",
+			"fieldtype": "Data",
+			"label": "Item Location"
+		},
+		{
+			"fieldname": "item_zip",
+			"fieldtype": "Data",
+			"label": "Item Zip Code"
+		},
+		{
+			"fieldname": "item_country",
+			"fieldtype": "Data",
+			"label": "Item Country"
+		},
+		{
+			"fieldname": "sold_via_promoted",
+			"fieldtype": "Check",
+			"label": "Sold Via Promoted Listings"
+		},
+		{
+			"fieldname": "shipping_section",
+			"fieldtype": "Section Break",
+			"label": "Shipping Information"
+		},
+		{
+			"fieldname": "tracking_number",
+			"fieldtype": "Data",
+			"label": "Tracking Number"
+		},
+		{
+			"fieldname": "shipping_service",
+			"fieldtype": "Data",
+			"label": "Shipping Service"
+		},
+		{
+			"fieldname": "column_break_shipping",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "min_delivery_date",
+			"fieldtype": "Date",
+			"label": "Min Estimated Delivery"
+		},
+		{
+			"fieldname": "max_delivery_date",
+			"fieldtype": "Date",
+			"label": "Max Estimated Delivery"
+		},
+		{
+			"fieldname": "payment_section",
+			"fieldtype": "Section Break",
+			"label": "Payment Information"
+		},
+		{
+			"fieldname": "payment_method",
+			"fieldtype": "Data",
+			"label": "Payment Method"
+		},
+		{
+			"fieldname": "paypal_transaction_id",
+			"fieldtype": "Data",
+			"label": "PayPal Transaction ID"
+		},
+		{
+			"fieldname": "tax_section",
+			"fieldtype": "Section Break",
+			"label": "Tax Information"
+		},
+		{
+			"fieldname": "tax_status",
+			"fieldtype": "Data",
+			"label": "Tax Status"
+		},
+		{
+			"fieldname": "tax_rate",
+			"fieldtype": "Data",
+			"label": "Tax Rate"
+		},
+		{
+			"fieldname": "tax_type",
+			"fieldtype": "Data",
+			"label": "Tax Type"
+		},
+		{
+			"fieldname": "tax_included_in_total",
+			"fieldtype": "Check",
+			"label": "Tax Included in Total"
+		},
+		{
+			"fieldname": "column_break_tax",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "tax_city",
+			"fieldtype": "Data",
+			"label": "Tax City"
+		},
+		{
+			"fieldname": "tax_state",
+			"fieldtype": "Data",
+			"label": "Tax State"
+		},
+		{
+			"fieldname": "tax_zip",
+			"fieldtype": "Data",
+			"label": "Tax Zip"
+		},
+		{
+			"fieldname": "tax_country",
+			"fieldtype": "Data",
+			"label": "Tax Country"
+		},
+		{
+			"fieldname": "fees_section",
+			"fieldtype": "Section Break",
+			"label": "Fees and Charges",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "ebay_collected_tax",
+			"fieldtype": "Currency",
+			"label": "eBay Collected Tax"
+		},
+		{
+			"fieldname": "seller_collected_tax",
+			"fieldtype": "Currency",
+			"label": "Seller Collected Tax"
+		},
+		{
+			"fieldname": "ebay_charges",
+			"fieldtype": "Currency",
+			"label": "eBay Collected Charges"
+		},
+		{
+			"fieldname": "column_break_fees1",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "ewaste_fee",
+			"fieldtype": "Currency",
+			"label": "E-Waste Recycling Fee"
+		},
+		{
+			"fieldname": "mattress_fee",
+			"fieldtype": "Currency",
+			"label": "Mattress Recycling Fee"
+		},
+		{
+			"fieldname": "battery_fee",
+			"fieldtype": "Currency",
+			"label": "Battery Recycling Fee"
+		},
+		{
+			"fieldname": "white_goods_fee",
+			"fieldtype": "Currency",
+			"label": "White Goods Disposal Tax"
+		},
+		{
+			"fieldname": "tire_fee",
+			"fieldtype": "Currency",
+			"label": "Tire Recycling Fee"
+		},
+		{
+			"fieldname": "column_break_fees2",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "additional_fee",
+			"fieldtype": "Currency",
+			"label": "Additional Fee"
+		},
+		{
+			"fieldname": "lumber_fee",
+			"fieldtype": "Currency",
+			"label": "Lumber Fee"
+		},
+		{
+			"fieldname": "wireless_fee",
+			"fieldtype": "Currency",
+			"label": "Prepaid Wireless Fee"
+		},
+		{
+			"fieldname": "road_fee",
+			"fieldtype": "Currency",
+			"label": "Road/Food Delivery Fee"
+		},
+		{
+			"fieldname": "programs_section",
+			"fieldtype": "Section Break",
+			"label": "eBay Programs",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "global_shipping_program",
+			"fieldtype": "Check",
+			"label": "Global Shipping Program"
+		},
+		{
+			"fieldname": "global_shipping_ref_id",
+			"fieldtype": "Data",
+			"label": "Global Shipping Reference ID"
+		},
+		{
+			"fieldname": "ebay_international_shipping",
+			"fieldtype": "Check",
+			"label": "eBay International Shipping"
+		},
+		{
+			"fieldname": "column_break_programs1",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "click_and_collect",
+			"fieldtype": "Check",
+			"label": "Click And Collect"
+		},
+		{
+			"fieldname": "click_collect_ref",
+			"fieldtype": "Data",
+			"label": "Click & Collect Reference"
+		},
+		{
+			"fieldname": "ebay_plus",
+			"fieldtype": "Check",
+			"label": "eBay Plus"
+		},
+		{
+			"fieldname": "column_break_programs2",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "ebay_fulfillment_program",
+			"fieldtype": "Check",
+			"label": "eBay Fulfillment Program"
+		},
+		{
+			"fieldname": "authenticity_verification",
+			"fieldtype": "Check",
+			"label": "Authenticity Verification"
+		},
+		{
+			"fieldname": "auth_verification_status",
+			"fieldtype": "Data",
+			"label": "Auth Verification Status"
+		},
+		{
+			"fieldname": "auth_verification_reason",
+			"fieldtype": "Data",
+			"label": "Auth Verification Reason"
+		},
+		{
+			"fieldname": "column_break_programs3",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "psa_vault_program",
+			"fieldtype": "Check",
+			"label": "PSA Vault Program"
+		},
+		{
+			"fieldname": "vault_fulfillment_type",
+			"fieldtype": "Data",
+			"label": "Vault Fulfillment Type"
+		},
+		{
+			"fieldname": "feedback_section",
+			"fieldtype": "Section Break",
+			"label": "Feedback",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "feedback_left",
+			"fieldtype": "Check",
+			"label": "Feedback Left"
+		},
+		{
+			"fieldname": "feedback_received",
+			"fieldtype": "Data",
+			"label": "Feedback Received"
+		},
+		{
+			"fieldname": "my_item_note",
+			"fieldtype": "Small Text",
+			"label": "My Item Note"
+		},
+		{
+			"fieldname": "reference_section",
+			"fieldtype": "Section Break",
+			"label": "eBay Reference",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "ebay_reference_name",
+			"fieldtype": "Data",
+			"label": "eBay Reference Name"
+		},
+		{
+			"fieldname": "ebay_reference_value",
+			"fieldtype": "Data",
+			"label": "eBay Reference Value"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"issingle": 0,
+	"links": [
+		{
+			"link_doctype": "Sales Order",
+			"link_fieldname": "sales_order"
+		}
+	],
+	"modified": "2024-05-22 12:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "eBay Connector",
+	"name": "eBay Order",
+	"naming_rule": "Expression (old style)",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"read": 1,
+			"report": 1,
+			"role": "Sales User"
+		}
+	],
+	"search_fields": "ebay_order_number,buyer_username,buyer_name",
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"title_field": "ebay_order_number",
+	"track_changes": 1
+}

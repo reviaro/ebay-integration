@@ -1,0 +1,17 @@
+include MANIFEST.in
+include requirements.txt
+include *.md
+include *.py
+include *.txt
+recursive-include ebay_integration *.css
+recursive-include ebay_integration *.csv
+recursive-include ebay_integration *.html
+recursive-include ebay_integration *.ico
+recursive-include ebay_integration *.js
+recursive-include ebay_integration *.json
+recursive-include ebay_integration *.md
+recursive-include ebay_integration *.png
+recursive-include ebay_integration *.py
+recursive-include ebay_integration *.svg
+recursive-include ebay_integration *.txt
+recursive-exclude ebay_integration *.pyc

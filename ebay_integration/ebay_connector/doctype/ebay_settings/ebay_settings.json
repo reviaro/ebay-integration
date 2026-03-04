@@ -1,0 +1,220 @@
+{
+    "actions": [],
+    "creation": "2024-05-22 12:00:00.000000",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "general_section",
+        "sandbox",
+        "sync_enabled",
+        "credentials_section",
+        "client_id",
+        "client_secret",
+        "dev_id",
+        "ru_name",
+        "auth_code",
+        "column_break_credentials",
+        "access_token",
+        "refresh_token",
+        "defaults_section",
+        "default_company",
+        "default_warehouse",
+        "default_customer_group",
+        "column_break_defaults",
+        "tax_account_head",
+        "shipping_account",
+        "payment_account",
+        "refund_sync_section",
+        "enable_refund_sync",
+        "auto_process_cancellations",
+        "column_break_refund",
+        "refund_sync_days",
+        "authorize_section",
+        "authorize_button"
+    ],
+    "fields": [
+        {
+            "fieldname": "general_section",
+            "fieldtype": "Section Break",
+            "label": "General"
+        },
+        {
+            "default": "0",
+            "fieldname": "sandbox",
+            "fieldtype": "Check",
+            "label": "Sandbox Environment"
+        },
+        {
+            "default": "0",
+            "fieldname": "sync_enabled",
+            "fieldtype": "Check",
+            "label": "Enable Sync"
+        },
+        {
+            "fieldname": "credentials_section",
+            "fieldtype": "Section Break",
+            "label": "Credentials"
+        },
+        {
+            "fieldname": "client_id",
+            "fieldtype": "Data",
+            "label": "App ID (Client ID)",
+            "reqd": 1
+        },
+        {
+            "fieldname": "client_secret",
+            "fieldtype": "Password",
+            "label": "Cert ID (Client Secret)",
+            "reqd": 1
+        },
+        {
+            "fieldname": "dev_id",
+            "fieldtype": "Data",
+            "label": "Dev ID",
+            "reqd": 1
+        },
+        {
+            "fieldname": "ru_name",
+            "fieldtype": "Data",
+            "label": "RuName (Redirect URL Name)",
+            "reqd": 1
+        },
+        {
+            "fieldname": "auth_code",
+            "fieldtype": "Data",
+            "label": "Auth Code (Paste here after Authorize)"
+        },
+        {
+            "fieldname": "column_break_credentials",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "access_token",
+            "fieldtype": "Password",
+            "label": "Access Token",
+            "read_only": 1,
+            "hidden": 1
+        },
+        {
+            "fieldname": "refresh_token",
+            "fieldtype": "Password",
+            "label": "Refresh Token",
+            "read_only": 1,
+            "hidden": 1
+        },
+        {
+            "fieldname": "defaults_section",
+            "fieldtype": "Section Break",
+            "label": "Defaults"
+        },
+        {
+            "fieldname": "default_company",
+            "fieldtype": "Link",
+            "label": "Default Company",
+            "options": "Company",
+            "reqd": 1
+        },
+        {
+            "fieldname": "default_warehouse",
+            "fieldtype": "Link",
+            "label": "Default Warehouse",
+            "options": "Warehouse",
+            "reqd": 1
+        },
+        {
+            "fieldname": "default_customer_group",
+            "fieldtype": "Link",
+            "label": "Default Customer Group",
+            "options": "Customer Group",
+            "reqd": 1
+        },
+        {
+            "fieldname": "column_break_defaults",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "tax_account_head",
+            "fieldtype": "Link",
+            "label": "Tax Account (for eBay Collected Tax)",
+            "options": "Account",
+            "description": "Account to record eBay-collected sales tax"
+        },
+        {
+            "fieldname": "shipping_account",
+            "fieldtype": "Link",
+            "label": "Shipping Income Account",
+            "options": "Account",
+            "description": "Account to record shipping charges collected"
+        },
+        {
+            "fieldname": "payment_account",
+            "fieldtype": "Link",
+            "label": "Payment Account (Cash/Bank)",
+            "options": "Account",
+            "description": "Cash or Bank account for eBay payments received"
+        },
+        {
+            "fieldname": "refund_sync_section",
+            "fieldtype": "Section Break",
+            "label": "Cancellation & Refund Sync"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_refund_sync",
+            "fieldtype": "Check",
+            "label": "Enable Refund Sync",
+            "description": "Automatically sync cancellations and refunds from eBay"
+        },
+        {
+            "default": "0",
+            "fieldname": "auto_process_cancellations",
+            "fieldtype": "Check",
+            "label": "Auto-Process Cancellations",
+            "description": "Automatically create Credit Notes and Return Delivery Notes for cancelled orders"
+        },
+        {
+            "fieldname": "column_break_refund",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "30",
+            "fieldname": "refund_sync_days",
+            "fieldtype": "Int",
+            "label": "Refund Sync Days",
+            "description": "Number of days to look back when syncing refunds (default: 30)"
+        },
+        {
+            "fieldname": "authorize_section",
+            "fieldtype": "Section Break",
+            "label": "Actions"
+        },
+        {
+            "fieldname": "authorize_button",
+            "fieldtype": "Button",
+            "label": "Authorize eBay"
+        }
+    ],
+    "issingle": 1,
+    "links": [],
+    "modified": "2024-05-22 12:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "eBay Connector",
+    "name": "eBay Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "track_changes": 1
+}

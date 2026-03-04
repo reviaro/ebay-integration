@@ -1,0 +1,228 @@
+{
+	"actions": [],
+	"allow_rename": 0,
+	"autoname": "EBAY-REF-.#####",
+	"creation": "2024-05-22 12:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"order_section",
+		"ebay_order_id",
+		"ebay_refund_id",
+		"column_break_order",
+		"sales_order",
+		"sales_invoice",
+		"refund_section",
+		"refund_type",
+		"refund_amount",
+		"refund_reason",
+		"column_break_refund",
+		"refund_date",
+		"refund_status",
+		"processed_date",
+		"documents_section",
+		"credit_note",
+		"column_break_docs",
+		"return_delivery_note",
+		"notes_section",
+		"notes"
+	],
+	"fields": [
+		{
+			"fieldname": "order_section",
+			"fieldtype": "Section Break",
+			"label": "Order Information"
+		},
+		{
+			"fieldname": "ebay_order_id",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "eBay Order ID",
+			"reqd": 1,
+			"description": "The eBay order ID associated with this refund"
+		},
+		{
+			"fieldname": "ebay_refund_id",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "eBay Refund ID",
+			"unique": 1,
+			"description": "Unique refund transaction ID from eBay Finances API"
+		},
+		{
+			"fieldname": "column_break_order",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "sales_order",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Sales Order",
+			"options": "Sales Order",
+			"description": "Linked ERPNext Sales Order"
+		},
+		{
+			"fieldname": "sales_invoice",
+			"fieldtype": "Link",
+			"label": "Sales Invoice",
+			"options": "Sales Invoice",
+			"description": "Original Sales Invoice being refunded"
+		},
+		{
+			"fieldname": "refund_section",
+			"fieldtype": "Section Break",
+			"label": "Refund Details"
+		},
+		{
+			"fieldname": "refund_type",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Refund Type",
+			"options": "\nFull Refund\nPartial Refund\nCancellation Refund\nReturn Refund\nShipping Refund\nGoodwill Refund",
+			"reqd": 1,
+			"description": "Type of refund transaction"
+		},
+		{
+			"fieldname": "refund_amount",
+			"fieldtype": "Currency",
+			"in_list_view": 1,
+			"label": "Refund Amount",
+			"reqd": 1,
+			"description": "Total amount refunded to buyer"
+		},
+		{
+			"fieldname": "refund_reason",
+			"fieldtype": "Small Text",
+			"label": "Refund Reason",
+			"description": "Reason for the refund from eBay"
+		},
+		{
+			"fieldname": "column_break_refund",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "refund_date",
+			"fieldtype": "Datetime",
+			"label": "Refund Date",
+			"reqd": 1,
+			"description": "Date and time the refund was issued on eBay"
+		},
+		{
+			"fieldname": "refund_status",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Refund Status",
+			"options": "Pending\nProcessed\nFailed\nCancelled",
+			"default": "Pending",
+			"description": "Current processing status in ERPNext"
+		},
+		{
+			"fieldname": "processed_date",
+			"fieldtype": "Datetime",
+			"label": "Processed Date",
+			"read_only": 1,
+			"description": "Date when the refund was processed in ERPNext"
+		},
+		{
+			"fieldname": "documents_section",
+			"fieldtype": "Section Break",
+			"label": "Related Documents"
+		},
+		{
+			"fieldname": "credit_note",
+			"fieldtype": "Link",
+			"label": "Credit Note",
+			"options": "Sales Invoice",
+			"description": "Credit Note created for this refund (is_return=1)"
+		},
+		{
+			"fieldname": "column_break_docs",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "return_delivery_note",
+			"fieldtype": "Link",
+			"label": "Return Delivery Note",
+			"options": "Delivery Note",
+			"description": "Return Delivery Note for physical returns (is_return=1)"
+		},
+		{
+			"fieldname": "notes_section",
+			"fieldtype": "Section Break",
+			"label": "Notes"
+		},
+		{
+			"fieldname": "notes",
+			"fieldtype": "Text",
+			"label": "Notes",
+			"description": "Additional notes or comments about this refund"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"issingle": 0,
+	"links": [
+		{
+			"link_doctype": "Sales Order",
+			"link_fieldname": "sales_order"
+		},
+		{
+			"link_doctype": "Sales Invoice",
+			"link_fieldname": "sales_invoice"
+		},
+		{
+			"link_doctype": "Sales Invoice",
+			"link_fieldname": "credit_note"
+		}
+	],
+	"modified": "2024-05-22 12:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "eBay Connector",
+	"name": "eBay Refund",
+	"naming_rule": "Expression (old style)",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"read": 1,
+			"report": 1,
+			"role": "Sales User"
+		},
+		{
+			"read": 1,
+			"report": 1,
+			"role": "Accounts User"
+		}
+	],
+	"search_fields": "ebay_order_id,ebay_refund_id,sales_order",
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"title_field": "ebay_order_id",
+	"track_changes": 1
+}

@@ -1,0 +1,175 @@
+{
+	"actions": [],
+	"autoname": "format:PRICE-CMP-{#####}",
+	"creation": "2024-05-22 12:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"item_section",
+		"item_code",
+		"item_name",
+		"your_price",
+		"column_break_1",
+		"search_keywords",
+		"comparison_date",
+		"listings_found",
+		"price_statistics_section",
+		"lowest_price",
+		"highest_price",
+		"column_break_2",
+		"average_price",
+		"median_price",
+		"analysis_section",
+		"price_position",
+		"column_break_3",
+		"price_difference",
+		"price_difference_pct"
+	],
+	"fields": [
+		{
+			"fieldname": "item_section",
+			"fieldtype": "Section Break",
+			"label": "Item Information"
+		},
+		{
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Item Code",
+			"options": "Item",
+			"reqd": 1
+		},
+		{
+			"fieldname": "item_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Item Name",
+			"read_only": 1
+		},
+		{
+			"fieldname": "your_price",
+			"fieldtype": "Currency",
+			"in_list_view": 1,
+			"label": "Your Price",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_1",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "search_keywords",
+			"fieldtype": "Data",
+			"label": "Search Keywords",
+			"read_only": 1
+		},
+		{
+			"fieldname": "comparison_date",
+			"fieldtype": "Datetime",
+			"label": "Comparison Date",
+			"read_only": 1
+		},
+		{
+			"fieldname": "listings_found",
+			"fieldtype": "Int",
+			"label": "Listings Found",
+			"read_only": 1
+		},
+		{
+			"fieldname": "price_statistics_section",
+			"fieldtype": "Section Break",
+			"label": "Price Statistics"
+		},
+		{
+			"fieldname": "lowest_price",
+			"fieldtype": "Currency",
+			"label": "Lowest Price",
+			"read_only": 1
+		},
+		{
+			"fieldname": "highest_price",
+			"fieldtype": "Currency",
+			"label": "Highest Price",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_2",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "average_price",
+			"fieldtype": "Currency",
+			"in_list_view": 1,
+			"label": "Average Price",
+			"read_only": 1
+		},
+		{
+			"fieldname": "median_price",
+			"fieldtype": "Currency",
+			"label": "Median Price",
+			"read_only": 1
+		},
+		{
+			"fieldname": "analysis_section",
+			"fieldtype": "Section Break",
+			"label": "Analysis"
+		},
+		{
+			"fieldname": "price_position",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Price Position",
+			"options": "\nBelow Market\nAt Market\nAbove Market\nNo Match",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_3",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "price_difference",
+			"fieldtype": "Currency",
+			"in_list_view": 1,
+			"label": "Price Difference",
+			"read_only": 1
+		},
+		{
+			"fieldname": "price_difference_pct",
+			"fieldtype": "Percent",
+			"label": "Difference %",
+			"read_only": 1
+		}
+	],
+	"index_web_pages_for_search": 1,
+	"issingle": 0,
+	"links": [],
+	"modified": "2024-05-22 12:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "eBay Connector",
+	"name": "eBay Price Comparison",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"read": 1,
+			"report": 1,
+			"role": "Sales User"
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"track_changes": 0
+}

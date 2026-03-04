@@ -10,3 +10,8 @@ node_modules/
 dist/
 build/
 .eggs/
+
+# Dev-only files (not for public repo)
+CLAUDE.md
+CHANGES_SUMMARY.md
+commands_updated.txt

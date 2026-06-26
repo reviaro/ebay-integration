@@ -147,7 +147,7 @@ def update_existing_orders(days_back=90):
 
 			except Exception as e:
 				errors += 1
-				frappe.log_error(f"Error updating {ebay_order_id}: {e}", "eBay Update Orders")
+				frappe.log_error(message=f"Error updating {ebay_order_id}: {e}", title="eBay Update Orders")
 
 		frappe.db.commit()
 		result = f"Updated {updated} orders, skipped {skipped}, errors {errors}"
@@ -503,10 +503,18 @@ def create_invoice_and_payment(so, order_data):
 			dn.insert(ignore_permissions=True)
 			dn.submit()
 		except Exception as e:
-			# If stock not available, log but continue with invoice
+			# Stock not available or other DN error — log prominently so stock can be corrected manually
 			frappe.log_error(
-				message=f"Delivery Note error for {ebay_order_id}: {e}",
-				title="eBay Sync - DN Error"
+				message=(
+					f"Delivery Note could NOT be created for eBay order {ebay_order_id}.\n"
+					f"Stock was NOT reduced. Please run a Stock Reconciliation or create the DN manually.\n"
+					f"Error: {e}"
+				),
+				title="eBay DN Error — Stock Not Reduced"
+			)
+			log_sync_result(
+				"create_invoice_and_payment", "Error",
+				f"DN failed for {ebay_order_id} — stock not reduced. Check Error Log."
 			)
 			dn = None
 
@@ -570,7 +578,7 @@ def create_invoice_and_payment(so, order_data):
 			default_cash = frappe.db.get_value("Account", {"account_type": "Bank", "company": company, "is_group": 0}, "name")
 
 		if not default_cash or not default_receivable:
-			frappe.log_error(f"Missing payment accounts for company {company}", "eBay Payment Error")
+			frappe.log_error(message=f"Missing payment accounts for company {company}", title="eBay Payment Error")
 			return
 
 		pe = frappe.get_doc({
@@ -607,7 +615,7 @@ def log_sync_result(method, status, message, details=None):
 		"doctype": "eBay Log",
 		"method": method,
 		"status": status,
-		"message": message[:140] if message else "",
+		"message": message or "",
 		"details": details or ""
 	}).insert(ignore_permissions=True)
 	frappe.db.commit()

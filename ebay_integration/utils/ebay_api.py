@@ -98,28 +98,39 @@ class eBayWrapper:
 			pass
 
 	def get_orders(self, days_back=1):
-		"""Fetch orders from eBay using Fulfillment API (with auto token refresh)"""
+		"""Fetch all orders from eBay using Fulfillment API with pagination"""
 		try:
-			# Calculate time range
 			create_time_from = datetime.utcnow() - timedelta(days=days_back)
 			date_filter = create_time_from.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
-			# Use Fulfillment API
 			url = f"{self.base_url}/sell/fulfillment/v1/order"
-			params = {
-				"filter": f"creationdate:[{date_filter}..]",
-				"limit": 200
-			}
+			all_orders = []
+			offset = 0
+			limit = 200
 
-			response = self._make_request("GET", url, params=params)
+			while True:
+				params = {
+					"filter": f"creationdate:[{date_filter}..]",
+					"limit": limit,
+					"offset": offset
+				}
 
-			if response.status_code == 200:
-				data = response.json()
-				orders = data.get("orders", [])
-				return orders
-			else:
-				self.log_error("get_orders", f"Status {response.status_code}: {response.text}")
-				return []
+				response = self._make_request("GET", url, params=params)
+
+				if response.status_code == 200:
+					data = response.json()
+					orders = data.get("orders", [])
+					all_orders.extend(orders)
+
+					total = data.get("total", 0)
+					if offset + limit >= total:
+						break
+					offset += limit
+				else:
+					self.log_error("get_orders", f"Status {response.status_code}: {response.text}")
+					break
+
+			return all_orders
 
 		except Exception as e:
 			self.log_error("get_orders", str(e))
@@ -292,22 +303,31 @@ class eBayWrapper:
 			return []
 
 	def get_my_selling(self):
-		"""Fetch active inventory items using Inventory API (with auto token refresh)"""
+		"""Fetch all active inventory items using Inventory API with pagination"""
 		try:
 			url = f"{self.base_url}/sell/inventory/v1/inventory_item"
-			params = {
-				"limit": 100
-			}
+			all_items = []
+			offset = 0
+			limit = 100
 
-			response = self._make_request("GET", url, params=params)
+			while True:
+				params = {"limit": limit, "offset": offset}
+				response = self._make_request("GET", url, params=params)
 
-			if response.status_code == 200:
-				data = response.json()
-				items = data.get("inventoryItems", [])
-				return items
-			else:
-				self.log_error("get_my_selling", f"Status {response.status_code}: {response.text}")
-				return []
+				if response.status_code == 200:
+					data = response.json()
+					items = data.get("inventoryItems", [])
+					all_items.extend(items)
+
+					total = data.get("total", 0)
+					if offset + limit >= total:
+						break
+					offset += limit
+				else:
+					self.log_error("get_my_selling", f"Status {response.status_code}: {response.text}")
+					break
+
+			return all_items
 
 		except Exception as e:
 			self.log_error("get_my_selling", str(e))
@@ -319,7 +339,7 @@ class eBayWrapper:
 				"doctype": "eBay Log",
 				"method": method,
 				"status": "Error",
-				"message": str(result)[:140],
+				"message": str(result),
 				"details": str(result)
 			}).insert(ignore_permissions=True)
 			frappe.db.commit()
@@ -349,11 +369,12 @@ class eBayWrapper:
 			filters = [f"conditions:{{{condition}}}"]
 
 			# Add price range filter if specified
-			# Format: price:[min..max] or price:[min..] or price:[..max]
+			# Format: price:[min..max],priceCurrency:USD
 			if min_price is not None or max_price is not None:
 				min_val = str(int(min_price)) if min_price else ""
 				max_val = str(int(max_price)) if max_price else ""
 				filters.append(f"price:[{min_val}..{max_val}]")
+				filters.append("priceCurrency:USD")
 
 			params = {
 				"q": keywords,
@@ -367,7 +388,17 @@ class eBayWrapper:
 			if category_ids:
 				params["category_ids"] = category_ids
 
-			response = self._make_request("GET", url, params=params)
+			# Browse API requires X-EBAY-C-MARKETPLACE-ID header (unlike Fulfillment/Inventory APIs)
+			headers = self._get_headers()
+			headers["X-EBAY-C-MARKETPLACE-ID"] = "EBAY_US"
+
+			response = requests.request("GET", url, headers=headers, params=params)
+
+			# Handle 401 with token refresh (manual since we use custom headers)
+			if response.status_code == 401:
+				if self._refresh_token():
+					headers["Authorization"] = f"Bearer {self.access_token}"
+					response = requests.request("GET", url, headers=headers, params=params)
 
 			if response.status_code == 200:
 				data = response.json()

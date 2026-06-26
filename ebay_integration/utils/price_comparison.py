@@ -1,11 +1,12 @@
 import frappe
+import time
+import traceback
 from frappe.utils import flt, now_datetime
 
 
 def run_price_comparison():
 	"""Main function - called by scheduler every 4 days"""
 	if not frappe.db.get_single_value("eBay Settings", "sync_enabled"):
-		log_sync_result("price_comparison", "Skipped", "sync_enabled is OFF in eBay Settings")
 		return
 
 	try:
@@ -15,42 +16,41 @@ def run_price_comparison():
 		# Get all stock items with prices set
 		items = get_items_to_compare()
 
-		if not items:
-			log_sync_result("price_comparison", "Warning",
-				"No items found (need is_stock_item=1 and standard_rate > 0)")
-			return
-
 		compared = 0
-		errors = 0
-		for item in items:
-			try:
-				if compare_item_price(ebay, item):
-					compared += 1
-			except Exception as item_err:
-				errors += 1
-				if errors <= 3:
-					log_sync_result("price_comparison", "Error",
-						f"Item {item.name}: {str(item_err)[:100]}")
+		total = len(items)
+		for i, item in enumerate(items):
+			if compare_item_price(ebay, item):
+				compared += 1
+			# Log progress every 25 items
+			if (i + 1) % 25 == 0:
+				log_sync_result("price_comparison", "Info", f"Progress: {i+1}/{total} items checked, {compared} compared")
+				frappe.db.commit()
 
-		log_sync_result("price_comparison", "Success",
-			f"Compared {compared}/{len(items)} items, {errors} errors")
+		log_sync_result("price_comparison", "Success", f"Compared {compared} of {total} items")
 		frappe.db.commit()
 
 	except Exception as e:
 		log_sync_result("price_comparison", "Error", str(e))
-		frappe.log_error(frappe.get_traceback(), "Price Comparison Error")
+		frappe.log_error(message=str(e), title="Price Comparison Error")
 
 
 def get_items_to_compare():
-	"""Get items from inventory that have prices set"""
-	return frappe.get_all("Item",
+	"""Get items from inventory that have prices set.
+	Limited to 200 items per run to avoid API rate limits and long execution times.
+	Prioritizes items that haven't been compared recently.
+	"""
+	# Get items that either haven't been compared or were compared longest ago
+	items = frappe.get_all("Item",
 		filters={
 			"disabled": 0,
 			"is_stock_item": 1,
 			"standard_rate": [">", 0]
 		},
-		fields=["name", "item_name", "standard_rate"]
+		fields=["name", "item_name", "standard_rate"],
+		order_by="modified asc",
+		limit_page_length=200
 	)
+	return items
 
 
 def compare_item_price(ebay, item):
@@ -92,8 +92,12 @@ def compare_item_price(ebay, item):
 
 	prices = extract_prices_from_results(results)
 
+	# Rate limit: wait between API calls to avoid eBay throttling
+	time.sleep(0.5)
+
 	# PASS 2: If too few results, try without price filter but keep category
 	if len(prices) < 5:
+		time.sleep(0.5)
 		results = ebay.search_similar_items(
 			keywords,
 			condition="USED",
@@ -104,6 +108,7 @@ def compare_item_price(ebay, item):
 
 	# PASS 3: If still too few, try without category filter (last resort)
 	if len(prices) < 3:
+		time.sleep(0.5)
 		results = ebay.search_similar_items(
 			keywords,
 			condition="USED",
@@ -361,114 +366,28 @@ def create_comparison_record(item, keywords, stats, position, total_found):
 @frappe.whitelist()
 def manual_price_comparison():
 	"""Manually trigger price comparison from UI - runs as background job"""
+	# Capture the current user so the background worker can send notifications back
+	current_user = frappe.session.user
 	# Enqueue as background job to avoid timeout
 	frappe.enqueue(
 		"ebay_integration.utils.price_comparison.run_price_comparison_background",
 		queue="long",
 		timeout=3600,  # 1 hour timeout
-		job_name="eBay Price Comparison"
+		job_name="eBay Price Comparison",
+		user=current_user
 	)
 	return "Price comparison started in background. Check eBay Logs for progress."
 
 
-@frappe.whitelist()
-def test_price_comparison():
-	"""Test price comparison with a single item - returns detailed diagnostic info.
-	Call from eBay Settings to see exactly what's happening."""
-	diagnostics = []
+def run_price_comparison_background(user=None):
+	"""Background job wrapper for price comparison with notifications
 
-	# Step 1: Check sync_enabled
-	sync_enabled = frappe.db.get_single_value("eBay Settings", "sync_enabled")
-	diagnostics.append(f"1. sync_enabled: {sync_enabled}")
-	# Note: manual test runs regardless of sync_enabled
+	Args:
+		user: The user who triggered the job (for sending notifications)
+	"""
+	# Use the passed user, fall back to session user
+	notify_user = user or frappe.session.user
 
-	# Step 2: Check for items
-	items = get_items_to_compare()
-	diagnostics.append(f"2. Items found (is_stock_item=1, standard_rate>0): {len(items)}")
-
-	if not items:
-		diagnostics.append("   PROBLEM: No items qualify. Check that your Items have is_stock_item=1 and standard_rate > 0")
-		return "\n".join(diagnostics)
-
-	# Show first 5 items
-	for i, it in enumerate(items[:5]):
-		diagnostics.append(f"   - {it.name}: {it.item_name} (${it.standard_rate})")
-	if len(items) > 5:
-		diagnostics.append(f"   ... and {len(items) - 5} more")
-
-	# Step 3: Test eBay API connection
-	try:
-		from ebay_integration.utils.ebay_api import eBayWrapper
-		ebay = eBayWrapper()
-		diagnostics.append("3. eBayWrapper initialized OK")
-	except Exception as e:
-		diagnostics.append(f"3. FAILED to create eBayWrapper: {str(e)}")
-		return "\n".join(diagnostics)
-
-	# Step 4: Test search with first item
-	test_item = items[0]
-	keywords = extract_search_keywords(test_item.item_name)
-	diagnostics.append(f"4. Test item: {test_item.item_name}")
-	diagnostics.append(f"   Keywords: '{keywords}'")
-
-	if not keywords:
-		diagnostics.append("   PROBLEM: No keywords extracted from item name")
-		return "\n".join(diagnostics)
-
-	# Step 5: Try the actual eBay Browse API call
-	try:
-		your_price = flt(test_item.standard_rate)
-		min_price = your_price * 0.25 if your_price > 20 else 5
-
-		results = ebay.search_similar_items(
-			keywords,
-			condition="USED",
-			limit=10,
-			category_ids="6028",
-			min_price=min_price,
-			max_price=your_price * 4
-		)
-
-		diagnostics.append(f"5. Browse API response:")
-		diagnostics.append(f"   Total results: {results.get('total', 'N/A')}")
-		diagnostics.append(f"   Items returned: {len(results.get('items', []))}")
-
-		prices = extract_prices_from_results(results)
-		diagnostics.append(f"   Prices extracted: {len(prices)}")
-
-		if prices:
-			diagnostics.append(f"   Price range: ${min(prices):.2f} - ${max(prices):.2f}")
-			diagnostics.append(f"   Your price: ${your_price:.2f}")
-			diagnostics.append(f"   STATUS: Working correctly!")
-		else:
-			# Try without filters
-			diagnostics.append("   No prices with filters, trying without category...")
-			results2 = ebay.search_similar_items(
-				keywords,
-				condition="USED",
-				limit=10
-			)
-			prices2 = extract_prices_from_results(results2)
-			diagnostics.append(f"   Without category: {len(prices2)} prices found")
-
-			if not prices2:
-				diagnostics.append("   PROBLEM: eBay API returns no results. Check:")
-				diagnostics.append("   - Is the OAuth token valid? (check eBay Settings)")
-				diagnostics.append("   - Does the token have Browse API scope?")
-				diagnostics.append("   - Check Error Log for API errors")
-			else:
-				diagnostics.append(f"   Prices: ${min(prices2):.2f} - ${max(prices2):.2f}")
-				diagnostics.append("   Category filter may be too restrictive")
-
-	except Exception as e:
-		diagnostics.append(f"5. FAILED Browse API call: {str(e)}")
-		diagnostics.append(f"   Full error: {frappe.get_traceback()[-500:]}")
-
-	return "\n".join(diagnostics)
-
-
-def run_price_comparison_background():
-	"""Background job wrapper for price comparison with notifications"""
 	try:
 		from ebay_integration.utils.ebay_api import eBayWrapper
 		ebay = eBayWrapper()
@@ -476,50 +395,59 @@ def run_price_comparison_background():
 		items = get_items_to_compare()
 		total = len(items)
 
-		if not total:
+		log_sync_result("price_comparison", "Info",
+			f"Starting: found {total} items to compare")
+		frappe.db.commit()
+
+		if total == 0:
 			log_sync_result("price_comparison", "Warning",
-				"No items found (need is_stock_item=1 and standard_rate > 0)")
-			frappe.publish_realtime(
-				"msgprint",
-				"Price comparison: No items found. Items need is_stock_item=1 and standard_rate > 0.",
-				user=frappe.session.user
-			)
+				"No items found to compare. Items need: disabled=0, is_stock_item=1, standard_rate > 0")
+			frappe.db.commit()
+			try:
+				frappe.publish_realtime(
+					"msgprint",
+					"Price comparison: No items found to compare. Items need is_stock_item=1 and standard_rate > 0.",
+					user=notify_user
+				)
+			except Exception:
+				pass  # Notification failure shouldn't stop the job
 			return
 
 		compared = 0
-		errors = 0
 
-		for item in items:
-			try:
-				if compare_item_price(ebay, item):
-					compared += 1
-			except Exception as item_err:
-				errors += 1
-				if errors <= 3:
-					log_sync_result("price_comparison", "Error",
-						f"Item {item.name}: {str(item_err)[:100]}")
+		for i, item in enumerate(items):
+			if compare_item_price(ebay, item):
+				compared += 1
+			# Log progress every 25 items
+			if (i + 1) % 25 == 0:
+				log_sync_result("price_comparison", "Info", f"Background progress: {i+1}/{total} items, {compared} compared")
+				frappe.db.commit()
 
-		msg = f"Compared {compared} of {total} items"
-		if errors:
-			msg += f" ({errors} errors - check eBay Logs)"
-
-		log_sync_result("price_comparison", "Success", msg)
+		log_sync_result("price_comparison", "Success", f"Compared {compared} of {total} items")
 		frappe.db.commit()
 
-		frappe.publish_realtime(
-			"msgprint",
-			f"Price comparison complete: {msg}",
-			user=frappe.session.user
-		)
+		# Send notification to user
+		try:
+			frappe.publish_realtime(
+				"msgprint",
+				f"Price comparison complete: {compared} of {total} items compared.",
+				user=notify_user
+			)
+		except Exception:
+			pass  # Notification failure shouldn't mask success
 
 	except Exception as e:
-		log_sync_result("price_comparison", "Error", str(e))
-		frappe.log_error(frappe.get_traceback(), "Price Comparison Error")
-		frappe.publish_realtime(
-			"msgprint",
-			f"Price comparison failed: {str(e)}",
-			user=frappe.session.user
-		)
+		tb = traceback.format_exc()
+		log_sync_result("price_comparison", "Error", str(e), details=tb)
+		frappe.log_error(message=tb, title="Price Comparison Error")
+		try:
+			frappe.publish_realtime(
+				"msgprint",
+				f"Price comparison failed: {str(e)}",
+				user=notify_user
+			)
+		except Exception:
+			pass
 
 
 def log_sync_result(method, status, message, details=None):
@@ -528,7 +456,7 @@ def log_sync_result(method, status, message, details=None):
 		"doctype": "eBay Log",
 		"method": method,
 		"status": status,
-		"message": message[:140] if message else "",
+		"message": message or "",
 		"details": details or ""
 	}).insert(ignore_permissions=True)
 	frappe.db.commit()

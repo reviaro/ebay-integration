@@ -648,7 +648,7 @@ def log_sync_result(method, status, message, details=None):
             "doctype": "eBay Log",
             "method": method,
             "status": status,
-            "message": message[:140] if message else "",
+            "message": message or "",
             "details": details or ""
         }).insert(ignore_permissions=True)
         frappe.db.commit()

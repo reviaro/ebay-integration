@@ -1,17 +1,31 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.env
-*.env
-node_modules/
-.claude/
-*.log
 *.egg-info/
 dist/
 build/
 .eggs/
 
+# Environment / secrets
+.env
+*.env
+
+# Node
+node_modules/
+
+# Claude Code (local dev only)
+.claude/
+
+# Logs
+*.log
+frontend/logs/
+
+# Test cache
+.pytest_cache/
+
 # Dev-only files (not for public repo)
 CLAUDE.md
 CHANGES_SUMMARY.md
 commands_updated.txt
+check_errors.py

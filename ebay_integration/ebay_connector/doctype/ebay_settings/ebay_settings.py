@@ -13,8 +13,7 @@ def get_authorize_url(doc_name):
 	doc = frappe.get_doc("eBay Settings", doc_name)
 
 	# OAuth scopes required for the integration:
-	# - api_scope: Basic API access
-	# - buy.browse: Browse API for price comparison feature
+	# - api_scope: Basic API access (includes Browse API for price comparison)
 	# - sell.marketing.readonly: Read marketing/promotion data
 	# - sell.inventory.readonly: Read inventory items
 	# - sell.account.readonly: Read account settings
@@ -22,7 +21,6 @@ def get_authorize_url(doc_name):
 	# - sell.finances: Read financial transactions (refunds, payouts)
 	scopes = " ".join([
 		"https://api.ebay.com/oauth/api_scope",
-		"https://api.ebay.com/oauth/api_scope/buy.browse",
 		"https://api.ebay.com/oauth/api_scope/sell.marketing.readonly",
 		"https://api.ebay.com/oauth/api_scope/sell.inventory.readonly",
 		"https://api.ebay.com/oauth/api_scope/sell.account.readonly",
@@ -136,7 +134,7 @@ def manual_sync_inventory():
 	"""Manually trigger inventory sync from eBay Settings page"""
 	try:
 		from ebay_integration.utils.sync_inventory import sync_inventory
-		sync_inventory()
+		sync_inventory(force=True)
 		frappe.db.commit()
 		return "Inventory sync completed. Check eBay Log for details."
 	except Exception as e:
@@ -171,6 +169,54 @@ def manual_update_orders(days_back=90):
 		return "Update completed. Check eBay Log for details."
 	except Exception as e:
 		frappe.log_error(message=str(e), title="Manual Update Orders Error")
+		return f"Error: {str(e)}"
+
+
+@frappe.whitelist()
+def retry_failed_orders():
+	"""Retry invoice + payment creation for eBay Sales Orders stuck in To Bill / Overdue."""
+	try:
+		from ebay_integration.utils.sync_orders import create_invoice_and_payment, log_sync_result
+
+		stuck_orders = frappe.db.sql("""
+			SELECT so.name, so.po_no
+			FROM `tabSales Order` so
+			WHERE so.docstatus = 1
+			AND so.status IN ('To Bill', 'Overdue', 'To Deliver and Bill')
+			AND so.po_no IS NOT NULL
+			AND so.po_no != ''
+			AND NOT EXISTS (
+				SELECT 1 FROM `tabSales Invoice Item` sii
+				JOIN `tabSales Invoice` si ON si.name = sii.parent
+				WHERE sii.sales_order = so.name
+				AND si.docstatus = 1
+			)
+		""", as_dict=True)
+
+		success = 0
+		failed = 0
+
+		for row in stuck_orders:
+			try:
+				so = frappe.get_doc("Sales Order", row.name)
+				create_invoice_and_payment(so, {"orderId": row.po_no})
+				frappe.db.commit()
+				success += 1
+			except Exception as e:
+				failed += 1
+				frappe.log_error(message=str(e), title=f"Retry Failed Order: {row.name}")
+
+		total = len(stuck_orders)
+		if total == 0:
+			msg = "No stuck orders found — all eBay orders are fully processed."
+		else:
+			msg = f"Found {total} stuck orders: {success} succeeded, {failed} failed."
+
+		log_sync_result("retry_failed_orders", "Success" if failed == 0 else "Error", msg)
+		frappe.db.commit()
+		return msg
+	except Exception as e:
+		frappe.log_error(message=str(e), title="Retry Failed Orders Error")
 		return f"Error: {str(e)}"
 
 

@@ -58,7 +58,7 @@ def import_ebay_csv(file_content, update_existing=False):
 			except Exception as e:
 				error_msg = f"Row {i+1}: {str(e)}"
 				results['errors'].append(error_msg)
-				frappe.log_error(error_msg, "eBay CSV Import Row Error")
+				frappe.log_error(message=error_msg, title="eBay CSV Import Row Error")
 
 		frappe.db.commit()
 		results['messages'].append(
@@ -68,7 +68,7 @@ def import_ebay_csv(file_content, update_existing=False):
 
 	except Exception as e:
 		results['errors'].append(f"CSV parsing error: {str(e)}")
-		frappe.log_error(str(e), "eBay CSV Import Error")
+		frappe.log_error(message=str(e), title="eBay CSV Import Error")
 
 	return results
 
@@ -491,7 +491,7 @@ def process_csv_row(row, company, update_existing=False):
 	try:
 		create_csv_invoice_and_payment(so, order_number, paid_date)
 	except Exception as e:
-		frappe.log_error(f"Invoice error for {order_number}: {e}", "eBay CSV Import")
+		frappe.log_error(message=f"Invoice error for {order_number}: {e}", title="eBay CSV Invoice Error")
 
 	return 'imported'
 
@@ -518,7 +518,7 @@ def update_existing_order(so_name, row, company):
 		return 'updated'
 
 	except Exception as e:
-		frappe.log_error(f"Error updating {so_name}: {e}", "eBay CSV Update")
+		frappe.log_error(message=f"Error updating {so_name}: {e}", title="eBay CSV Update")
 		return 'skipped'
 
 
@@ -768,7 +768,7 @@ def create_customer_address(customer_name, address_title, phone,
 		address.insert(ignore_permissions=True)
 		return address.name
 	except Exception as e:
-		frappe.log_error(f"Address creation error: {e}", "eBay CSV Import")
+		frappe.log_error(message=f"Address creation error: {e}", title="eBay CSV Address Error")
 		return None
 
 
@@ -999,7 +999,7 @@ def create_ebay_order_record(sales_order, row_data):
 		return ebay_order.name
 	except Exception as e:
 		# Log error but don't fail the import
-		frappe.log_error(f"eBay Order record error: {e}", "eBay CSV Import")
+		frappe.log_error(message=f"eBay Order record error: {e}", title="eBay CSV Order Record Error")
 		return None
 
 
@@ -1062,7 +1062,7 @@ def create_csv_invoice_and_payment(so, order_number, paid_date=None):
 		dn.submit()
 	except Exception as e:
 		# If stock not available, log but continue with invoice
-		frappe.log_error(f"Delivery Note error for {order_number}: {e}", "eBay CSV Import")
+		frappe.log_error(message=f"Delivery Note error for {order_number}: {e}", title="eBay CSV DN Error")
 		dn = None
 
 	# ============================================
@@ -1129,7 +1129,7 @@ def create_csv_invoice_and_payment(so, order_number, paid_date=None):
 		default_cash = frappe.db.get_value("Account", {"account_type": "Bank", "company": company, "is_group": 0}, "name")
 
 	if not default_cash or not default_receivable:
-		frappe.log_error(f"Missing payment accounts for {order_number}", "eBay CSV Import")
+		frappe.log_error(message=f"Missing payment accounts for {order_number}", title="eBay CSV Payment Error")
 		return
 
 	pe = frappe.get_doc({
@@ -1174,5 +1174,5 @@ def upload_csv_file(file_url, update_existing=False):
 		results = import_ebay_csv(file_content, update_existing)
 		return results
 	except Exception as e:
-		frappe.log_error(str(e), "eBay CSV Upload Error")
+		frappe.log_error(message=str(e), title="eBay CSV Upload Error")
 		return {'errors': [str(e)], 'imported': 0, 'updated': 0, 'skipped': 0, 'messages': []}

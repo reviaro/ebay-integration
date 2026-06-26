@@ -20,12 +20,12 @@
             "fieldname": "status",
             "fieldtype": "Select",
             "label": "Status",
-            "options": "Success\nError\nWarning",
+            "options": "Success\nError\nWarning\nInfo",
             "reqd": 1
         },
         {
             "fieldname": "message",
-            "fieldtype": "Data",
+            "fieldtype": "Small Text",
             "label": "Message"
         },
         {

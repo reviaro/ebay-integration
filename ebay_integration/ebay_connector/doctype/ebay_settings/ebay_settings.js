@@ -288,6 +288,23 @@ frappe.ui.form.on('eBay Settings', {
 		// PRICE COMPARISON BUTTONS
 		// ========================
 
+		frm.add_custom_button('Retry Failed Orders', function () {
+			frappe.call({
+				method: "ebay_integration.ebay_connector.doctype.ebay_settings.ebay_settings.retry_failed_orders",
+				freeze: true,
+				freeze_message: "Retrying stuck orders...",
+				callback: function (r) {
+					if (r.message) {
+						frappe.msgprint({
+							title: 'Retry Failed Orders',
+							message: r.message,
+							indicator: r.message.includes('failed') ? 'orange' : 'green'
+						});
+					}
+				}
+			});
+		}, 'API Sync');
+
 		frm.add_custom_button('Run Price Comparison', function () {
 			frappe.call({
 				method: "ebay_integration.utils.price_comparison.manual_price_comparison",
@@ -297,23 +314,6 @@ frappe.ui.form.on('eBay Settings', {
 							title: 'Price Comparison',
 							indicator: 'blue',
 							message: r.message + '<br><br>You will be notified when complete.'
-						});
-					}
-				}
-			});
-		}, 'API Sync');
-
-		frm.add_custom_button('Test Price Comparison', function () {
-			frappe.call({
-				method: "ebay_integration.utils.price_comparison.test_price_comparison",
-				freeze: true,
-				freeze_message: "Testing price comparison (single item)...",
-				callback: function (r) {
-					if (r.message) {
-						frappe.msgprint({
-							title: 'Price Comparison Diagnostic',
-							indicator: 'blue',
-							message: '<pre style="white-space: pre-wrap; font-size: 12px;">' + r.message + '</pre>'
 						});
 					}
 				}

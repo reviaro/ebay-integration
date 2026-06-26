@@ -112,7 +112,7 @@ def import_inventory_csv(file_content, create_items=True, update_stock=True):
 			except Exception as e:
 				error_msg = f"Row {i+1}: {str(e)}"
 				results['errors'].append(error_msg)
-				frappe.log_error(error_msg, "eBay Inventory CSV Row Error")
+				frappe.log_error(message=error_msg, title="eBay Inventory CSV Row Error")
 
 		# Log skip reasons
 		if skipped_reasons:
@@ -140,7 +140,7 @@ def import_inventory_csv(file_content, create_items=True, update_stock=True):
 				results['messages'].append(f"Created Stock Reconciliation for {len(reconciliation_items)} items")
 			except Exception as e:
 				results['errors'].append(f"Stock Reconciliation error: {str(e)}")
-				frappe.log_error(str(e), "eBay Inventory Stock Reconciliation Error")
+				frappe.log_error(message=str(e), title="eBay Inventory Stock Reconciliation Error")
 
 		frappe.db.commit()
 		results['messages'].append(
@@ -150,7 +150,7 @@ def import_inventory_csv(file_content, create_items=True, update_stock=True):
 
 	except Exception as e:
 		results['errors'].append(f"CSV parsing error: {str(e)}")
-		frappe.log_error(str(e), "eBay Inventory CSV Error")
+		frappe.log_error(message=str(e), title="eBay Inventory CSV Error")
 
 	return results
 
@@ -368,7 +368,7 @@ def get_or_create_item_group(category_name):
 	except frappe.exceptions.DuplicateEntryError:
 		return category_name
 	except Exception as e:
-		frappe.log_error(f"Error creating item group '{category_name}': {e}", "eBay Inventory Import")
+		frappe.log_error(message=f"Error creating item group '{category_name}': {e}", title="eBay Inventory Import")
 		return "All Item Groups"
 
 
@@ -457,7 +457,7 @@ def upload_inventory_csv(file_url, create_items=True, update_stock=True):
 		results = import_inventory_csv(file_content, create_items, update_stock)
 		return results
 	except Exception as e:
-		frappe.log_error(str(e), "eBay Inventory CSV Upload Error")
+		frappe.log_error(message=str(e), title="eBay Inventory CSV Upload Error")
 		return {
 			'errors': [str(e)],
 			'created': 0,

@@ -14,6 +14,8 @@ A comprehensive eBay connector for ERPNext that syncs orders and inventory from 
   - eBay program flags (Plus, Global Shipping, etc.)
 - **Automatic Document Creation**: Creates Sales Orders, Invoices, and Payments
 - **Stock Reconciliation**: Keeps inventory in sync with eBay
+- **Cancellations & Refunds**: Syncs every 6 hours — creates Credit Notes and Return Delivery Notes automatically
+- **Price Comparison**: Compares your ERPNext item prices against live eBay listings every 4 days, stores position and stats in the eBay Price Comparison doctype
 
 ## Installation
 
@@ -78,9 +80,29 @@ bench --site [your-site] clear-cache
 3. Click **Import Orders CSV** or **Import Inventory CSV**
 4. Upload your CSV file
 
+### Syncing Cancellations & Refunds
+
+Runs automatically every 6 hours. To trigger manually:
+
+1. Go to **eBay Settings**
+2. Click **Sync Cancellations & Refunds**
+
+Creates **eBay Refund** records linked to the original Sales Order, plus Credit Notes and Return Delivery Notes where applicable.
+
+### Price Comparison
+
+Runs automatically every 4 days. To trigger manually:
+
+1. Go to **eBay Settings**
+2. Click **Run Price Comparison**
+
+Results are stored in **eBay Price Comparison** — shows your price vs lowest/highest/average on eBay and your position among active listings.
+
 ### Viewing Data
 
 - **eBay Orders**: Stores all eBay-specific data linked to Sales Orders
+- **eBay Refunds**: Cancellations and refunds linked to Sales Orders
+- **eBay Price Comparison**: Price position vs live eBay listings
 - **eBay Log**: View sync history and errors
 
 ## CSV Field Support

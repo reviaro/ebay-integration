@@ -20,8 +20,9 @@ def sync_inventory(force=False):
 
 		company = frappe.db.get_single_value("eBay Settings", "default_company")
 
-		# Build a map of eBay SKU -> quantity for fast lookup
+		# Build a map of eBay SKU -> {qty, title, description} for fast lookup
 		ebay_qty_map = {}
+		ebay_product_map = {}
 		for item_data in items:
 			sku = item_data.get('sku')
 			if not sku:
@@ -30,12 +31,22 @@ def sync_inventory(force=False):
 			ship_avail = availability.get('shipToLocationAvailability', {})
 			ebay_qty_map[sku] = float(ship_avail.get('quantity', 0))
 
+			product = item_data.get('product', {}) or {}
+			ebay_product_map[sku] = {
+				"title": product.get('title'),
+				"description": product.get('description'),
+			}
+
 		reconciliation_items = []
 
 		# --- Pass 1: all eBay items (create if missing, reconcile quantity) ---
 		for sku, qty_ebay in ebay_qty_map.items():
+			product = ebay_product_map.get(sku, {})
 			if not frappe.db.exists("Item", sku):
-				_create_item_from_sku(sku)
+				_create_item_from_sku(sku, product.get("title"), product.get("description"))
+			else:
+				# Keep name/description in sync with eBay's current listing data
+				_update_item_details(sku, product.get("title"), product.get("description"))
 
 			valuation_rate = _get_valuation_rate(sku, default_warehouse)
 			reconciliation_items.append({
@@ -126,23 +137,49 @@ def _get_valuation_rate(item_code, warehouse):
 	return 0.01
 
 
-def _create_item_from_sku(sku):
-	"""Create a minimal stock item from an eBay SKU found during inventory sync."""
+def _create_item_from_sku(sku, title=None, description=None):
+	"""Create a stock item from an eBay SKU found during inventory sync.
+
+	Uses the eBay product title/description when available so the item is named
+	meaningfully instead of just by its SKU.
+	"""
 	try:
 		item = frappe.get_doc({
 			"doctype": "Item",
 			"item_code": sku,
-			"item_name": sku,
+			"item_name": title or sku,
 			"item_group": "All Item Groups",
 			"stock_uom": "Nos",
 			"is_stock_item": 1,
-			"description": f"eBay item (SKU: {sku})"
+			"description": description or f"eBay item (SKU: {sku})"
 		})
 		item.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(message=f"Could not create item for SKU {sku}: {e}",
 						 title="eBay Sync: Item Creation Error")
+
+
+def _update_item_details(sku, title=None, description=None):
+	"""Refresh an existing item's name/description from eBay product data.
+
+	Only writes the fields eBay actually provides, so items keep their current
+	values when eBay returns no product info. Best-effort: never raises.
+	"""
+	updates = {}
+	if title:
+		updates["item_name"] = title
+	if description:
+		updates["description"] = description
+
+	if not updates:
+		return
+
+	try:
+		frappe.db.set_value("Item", sku, updates, update_modified=False)
+	except Exception as e:
+		frappe.log_error(message=f"Could not update item details for SKU {sku}: {e}",
+						 title="eBay Sync: Item Update Error")
 
 
 def log_sync_result(method, status, message, details=None):

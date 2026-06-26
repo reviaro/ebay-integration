@@ -121,7 +121,8 @@ def update_existing_orders(days_back=90):
 					skipped += 1
 					continue
 
-				# Add taxes
+				# Add shipping (real revenue). eBay-collected tax is remitted by
+				# eBay, so it is kept only as an informational field, never billed.
 				if shipping_cost > 0:
 					shipping_account = get_shipping_account(company)
 					if shipping_account:
@@ -132,15 +133,8 @@ def update_existing_orders(days_back=90):
 							"tax_amount": shipping_cost
 						})
 
-				if ebay_tax > 0:
-					tax_account = get_tax_account(company)
-					if tax_account:
-						so.append("taxes", {
-							"charge_type": "Actual",
-							"account_head": tax_account,
-							"description": "eBay Collected Tax (Sales Tax/VAT)",
-							"tax_amount": ebay_tax
-						})
+				if ebay_tax > 0 and hasattr(so, "ebay_collected_tax"):
+					so.ebay_collected_tax = ebay_tax
 
 				so.save(ignore_permissions=True)
 				updated += 1
@@ -158,6 +152,59 @@ def update_existing_orders(days_back=90):
 		log_sync_result("update_existing_orders", "Error", str(e))
 		frappe.log_error(message=str(e), title="eBay Update Orders Error")
 		return {"updated": 0, "skipped": 0, "errors": 1, "message": str(e)}
+
+
+def extract_shipping_info(order_data):
+	"""Pull the shipping service code and tracking number from a Fulfillment API
+	order payload.
+
+	The buyer-selected shipping service is available immediately on the order
+	(fulfillmentStartInstructions[].shippingStep.shippingServiceCode). A tracking
+	number only appears once the order ships, so it may be absent at sync time.
+
+	Returns:
+		dict: {"shipping_service": str|None, "tracking_number": str|None}
+	"""
+	shipping_service = None
+	tracking_number = None
+
+	instructions = order_data.get("fulfillmentStartInstructions", []) or []
+	for instr in instructions:
+		shipping_step = instr.get("shippingStep", {}) or {}
+		if not shipping_service:
+			shipping_service = shipping_step.get("shippingServiceCode")
+		if not tracking_number:
+			tracking_number = (
+				shipping_step.get("shipmentTrackingNumber")
+				or shipping_step.get("trackingNumber")
+			)
+
+	return {"shipping_service": shipping_service, "tracking_number": tracking_number}
+
+
+def fetch_tracking_for_order(order_id):
+	"""Best-effort lookup of tracking info from the shipping_fulfillment endpoint.
+
+	Used for orders that are already shipped (e.g. historical imports). Returns
+	empty values on any error so order processing is never blocked.
+
+	Returns:
+		dict: {"tracking_number": str|None, "shipping_service": str|None}
+	"""
+	try:
+		from ebay_integration.utils.ebay_api import eBayWrapper
+		ebay = eBayWrapper()
+		for fulfillment in ebay.get_shipping_fulfillments(order_id):
+			tracking_number = fulfillment.get("shipmentTrackingNumber")
+			if tracking_number:
+				return {
+					"tracking_number": tracking_number,
+					"shipping_service": fulfillment.get("shippingCarrierCode"),
+				}
+	except Exception as e:
+		frappe.log_error(message=f"Could not fetch tracking for {order_id}: {e}",
+						 title="eBay Tracking Fetch Error")
+	return {"tracking_number": None, "shipping_service": None}
 
 
 def process_order(order_data):
@@ -268,16 +315,10 @@ def process_order(order_data):
 				"tax_amount": shipping_cost
 			})
 
-	# Add eBay-collected tax if present
-	if ebay_tax > 0:
-		tax_account = get_tax_account(company)
-		if tax_account:
-			taxes.append({
-				"charge_type": "Actual",
-				"account_head": tax_account,
-				"description": "eBay Collected Tax (Sales Tax/VAT)",
-				"tax_amount": ebay_tax
-			})
+	# eBay-collected (marketplace facilitator) tax is collected AND remitted by
+	# eBay, so it is NOT the seller's tax liability and must not be booked as a
+	# Sales Order charge (doing so overstates revenue/AR). Keep it as an
+	# informational field only.
 
 	# Create Sales Order
 	so_data = {
@@ -291,6 +332,9 @@ def process_order(order_data):
 		"items": items
 	}
 
+	if ebay_tax > 0:
+		so_data["ebay_collected_tax"] = ebay_tax
+
 	if taxes:
 		so_data["taxes"] = taxes
 
@@ -299,6 +343,30 @@ def process_order(order_data):
 	so.submit()
 
 	frappe.db.commit()
+
+	# Store eBay shipping service / tracking on the Sales Order (read-only fields)
+	shipping_info = extract_shipping_info(order_data)
+
+	# Tracking lives on a separate endpoint and only exists once shipped, so only
+	# look it up for already-fulfilled orders (e.g. historical backfill).
+	if not shipping_info.get("tracking_number") and order_data.get("orderFulfillmentStatus") == "FULFILLED":
+		tracking = fetch_tracking_for_order(ebay_order_id)
+		if tracking.get("tracking_number"):
+			shipping_info["tracking_number"] = tracking["tracking_number"]
+		if tracking.get("shipping_service") and not shipping_info.get("shipping_service"):
+			shipping_info["shipping_service"] = tracking["shipping_service"]
+
+	so_updates = {}
+	fulfillment_status = order_data.get("orderFulfillmentStatus")
+	if fulfillment_status:
+		so_updates["ebay_fulfillment_status"] = fulfillment_status
+	if shipping_info.get("shipping_service"):
+		so_updates["ebay_shipping_service"] = shipping_info["shipping_service"]
+	if shipping_info.get("tracking_number"):
+		so_updates["ebay_tracking_number"] = shipping_info["tracking_number"]
+	if so_updates:
+		frappe.db.set_value("Sales Order", so.name, so_updates, update_modified=False)
+		frappe.db.commit()
 
 	# Handle Payment if Paid
 	payment_status = order_data.get('orderPaymentStatus', '')

@@ -166,6 +166,84 @@ class TestGetMySelling:
 
 
 # ---------------------------------------------------------------------------
+# get_shipping_fulfillments() tests
+# ---------------------------------------------------------------------------
+
+class TestGetShippingFulfillments:
+    """Tests for eBayWrapper.get_shipping_fulfillments() tracking retrieval."""
+
+    def test_returns_fulfillments_on_200(self, ebay_wrapper):
+        fulfillments = [
+            {"shipmentTrackingNumber": "1Z999", "shippingCarrierCode": "UPS"}
+        ]
+        response = _mock_response(200, {"fulfillments": fulfillments})
+
+        with patch("requests.request", return_value=response) as mock_req:
+            result = ebay_wrapper.get_shipping_fulfillments("12-34567-89012")
+
+        assert result == fulfillments
+        # URL must target the shipping_fulfillment sub-resource for the order
+        called_url = mock_req.call_args[0][1]
+        assert called_url.endswith("/order/12-34567-89012/shipping_fulfillment")
+
+    def test_non_200_returns_empty_list(self, ebay_wrapper):
+        response = _mock_response(404, text="Not Found")
+        with patch("requests.request", return_value=response):
+            result = ebay_wrapper.get_shipping_fulfillments("bad-id")
+        assert result == []
+
+    def test_exception_returns_empty_list(self, ebay_wrapper):
+        with patch("requests.request", side_effect=RuntimeError("boom")):
+            result = ebay_wrapper.get_shipping_fulfillments("12-1")
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# get_sale_transactions() tests
+# ---------------------------------------------------------------------------
+
+class TestGetSaleTransactions:
+    """Tests for eBayWrapper.get_sale_transactions() (selling-fee source)."""
+
+    def test_returns_sale_transactions_on_200(self, ebay_wrapper):
+        txns = [{"transactionType": "SALE", "orderId": "12-1",
+                 "totalFeeAmount": {"value": "4.50", "currency": "USD"}}]
+        response = _mock_response(200, {"transactions": txns, "total": 1})
+
+        with patch("requests.request", return_value=response) as mock_req:
+            result = ebay_wrapper.get_sale_transactions(days_back=30)
+
+        assert result == txns
+        # Must filter for SALE transactions
+        params = mock_req.call_args.kwargs["params"]
+        assert "SALE" in params["filter"]
+
+    def test_paginates_across_pages(self, ebay_wrapper):
+        page1 = [{"transactionType": "SALE", "orderId": f"o{i}"} for i in range(100)]
+        page2 = [{"transactionType": "SALE", "orderId": f"o{i}"} for i in range(100, 130)]
+        responses = [
+            _mock_response(200, {"transactions": page1, "total": 130}),
+            _mock_response(200, {"transactions": page2, "total": 130}),
+        ]
+        with patch("requests.request", side_effect=responses) as mock_req:
+            result = ebay_wrapper.get_sale_transactions(days_back=30)
+
+        assert len(result) == 130
+        assert mock_req.call_count == 2
+
+    def test_non_200_returns_empty_list(self, ebay_wrapper):
+        response = _mock_response(500, text="Server Error")
+        with patch("requests.request", return_value=response):
+            result = ebay_wrapper.get_sale_transactions()
+        assert result == []
+
+    def test_exception_returns_empty_list(self, ebay_wrapper):
+        with patch("requests.request", side_effect=RuntimeError("boom")):
+            result = ebay_wrapper.get_sale_transactions()
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
 # get_orders() tests
 # ---------------------------------------------------------------------------
 

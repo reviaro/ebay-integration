@@ -97,7 +97,8 @@ def frappe_mock(monkeypatch):
     )
     _f.get_all.return_value = []
     _f.get_single.return_value = MagicMock()
-    _f.log_error.return_value = None
+    # Reassign (not just .return_value) so call history doesn't leak between tests
+    _f.log_error = MagicMock(return_value=None)
 
     return _f
 

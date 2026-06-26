@@ -43,6 +43,10 @@ scheduler_events = {
 		# Sync cancellations and refunds every 6 hours
 		"0 */6 * * *": [
 			"ebay_integration.utils.sync_cancellations.sync_cancellations_and_refunds"
+		],
+		# Sync eBay selling fees daily at 1:00 AM (gated by enable_fee_sync, OFF by default)
+		"0 1 * * *": [
+			"ebay_integration.utils.sync_fees.sync_seller_fees"
 		]
 	}
 }

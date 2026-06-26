@@ -147,6 +147,35 @@ frappe.ui.form.on('eBay Settings', {
 			}, 'Sync Cancellations/Refunds', 'Sync');
 		}, 'API Sync');
 
+		// Sync eBay Selling Fees (gated by enable_fee_sync, OFF by default)
+		frm.add_custom_button('Sync Selling Fees', function () {
+			frappe.prompt({
+				label: 'Days Back',
+				fieldname: 'days_back',
+				fieldtype: 'Int',
+				default: 30,
+				description: 'Number of days to look back for eBay selling fees'
+			}, function (values) {
+				frappe.call({
+					method: "ebay_integration.utils.sync_fees.manual_sync_fees",
+					args: {
+						days_back: values.days_back
+					},
+					freeze: true,
+					freeze_message: "Booking eBay selling fees...",
+					callback: function (r) {
+						if (r.message) {
+							frappe.msgprint({
+								title: 'Selling Fee Sync Complete',
+								message: r.message,
+								indicator: 'green'
+							});
+						}
+					}
+				});
+			}, 'Sync Selling Fees', 'Sync');
+		}, 'API Sync');
+
 
 		// ========================
 		// CSV IMPORT BUTTONS

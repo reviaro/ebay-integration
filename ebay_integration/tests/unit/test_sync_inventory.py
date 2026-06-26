@@ -25,6 +25,7 @@ from unittest.mock import MagicMock, patch, call
 from ebay_integration.utils.sync_inventory import (
     _get_valuation_rate,
     _create_item_from_sku,
+    _update_item_details,
     sync_inventory,
 )
 
@@ -244,6 +245,62 @@ class TestCreateItemFromSku:
         frappe_mock.log_error.assert_called_once()
         error_msg = frappe_mock.log_error.call_args[1].get("message", "")
         assert "DUP-SKU" in error_msg
+
+    def test_uses_ebay_title_as_item_name(self, frappe_mock):
+        """When eBay provides a product title, it becomes the item_name."""
+        mock_doc = MagicMock()
+        frappe_mock.get_doc = MagicMock(return_value=mock_doc)
+
+        _create_item_from_sku("SKU-9", title="Genuine OEM Brake Pad", description="Front set")
+
+        doc_data = frappe_mock.get_doc.call_args[0][0]
+        assert doc_data["item_name"] == "Genuine OEM Brake Pad"
+        assert doc_data["description"] == "Front set"
+
+    def test_falls_back_to_sku_when_no_title(self, frappe_mock):
+        """Without an eBay title the item_name stays the SKU (backwards compatible)."""
+        mock_doc = MagicMock()
+        frappe_mock.get_doc = MagicMock(return_value=mock_doc)
+
+        _create_item_from_sku("SKU-10")
+
+        doc_data = frappe_mock.get_doc.call_args[0][0]
+        assert doc_data["item_name"] == "SKU-10"
+
+
+# ---------------------------------------------------------------------------
+# _update_item_details
+# ---------------------------------------------------------------------------
+
+class TestUpdateItemDetails:
+
+    def test_updates_name_and_description_on_existing_item(self, frappe_mock):
+        frappe_mock.db.set_value = MagicMock()
+
+        _update_item_details("SKU-1", "New Title", "New Description")
+
+        frappe_mock.db.set_value.assert_called_once()
+        args = frappe_mock.db.set_value.call_args[0]
+        assert args[0] == "Item"
+        assert args[1] == "SKU-1"
+        assert args[2]["item_name"] == "New Title"
+        assert args[2]["description"] == "New Description"
+
+    def test_updates_only_title_when_description_missing(self, frappe_mock):
+        frappe_mock.db.set_value = MagicMock()
+
+        _update_item_details("SKU-2", "Only Title", None)
+
+        values = frappe_mock.db.set_value.call_args[0][2]
+        assert values["item_name"] == "Only Title"
+        assert "description" not in values
+
+    def test_no_update_when_neither_provided(self, frappe_mock):
+        frappe_mock.db.set_value = MagicMock()
+
+        _update_item_details("SKU-3", None, None)
+
+        frappe_mock.db.set_value.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -240,6 +240,59 @@ class eBayWrapper:
 			self.log_error("get_refund_transactions", str(e))
 			return []
 
+	def get_sale_transactions(self, days_back=30):
+		"""Fetch SALE transactions from the eBay Finances API.
+
+		Each SALE transaction carries the seller's marketplace fees for that order
+		under ``totalFeeAmount`` — the eBay commission that reduces the payout.
+
+		Args:
+			days_back: Number of days to look back (default: 30)
+
+		Returns:
+			list: SALE transaction dicts. Empty list on error.
+		"""
+		try:
+			transaction_date_from = datetime.utcnow() - timedelta(days=days_back)
+			date_filter = transaction_date_from.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+			url = f"{self.base_url}/sell/finances/v1/transaction"
+
+			all_transactions = []
+			offset = 0
+			limit = 100
+
+			while True:
+				params = {
+					"filter": f"transactionType:{{SALE}},transactionDate:[{date_filter}..]",
+					"limit": limit,
+					"offset": offset
+				}
+
+				response = self._make_request("GET", url, params=params)
+
+				if response.status_code == 200:
+					data = response.json()
+					transactions = data.get("transactions", [])
+					all_transactions.extend(transactions)
+
+					total = data.get("total", 0)
+					if offset + limit >= total:
+						break
+					offset += limit
+				else:
+					self.log_error("get_sale_transactions",
+								   f"Status {response.status_code}: {response.text[:200]}")
+					break
+
+			self.log_info("get_sale_transactions",
+						  f"Retrieved {len(all_transactions)} sale transactions")
+			return all_transactions
+
+		except Exception as e:
+			self.log_error("get_sale_transactions", str(e))
+			return []
+
 	def get_cancellation_requests(self, days_back=30):
 		"""Fetch orders with active cancellation requests.
 
@@ -300,6 +353,37 @@ class eBayWrapper:
 
 		except Exception as e:
 			self.log_error("get_cancellation_requests", str(e))
+			return []
+
+	def get_shipping_fulfillments(self, order_id):
+		"""Fetch shipment/tracking records for an order from the Fulfillment API.
+
+		Tracking numbers are not part of the order summary; they live on the
+		shipping_fulfillment sub-resource that is populated once the seller ships.
+
+		GET /sell/fulfillment/v1/order/{orderId}/shipping_fulfillment
+
+		Args:
+			order_id: The eBay order ID
+
+		Returns:
+			list: fulfillment records (each with shipmentTrackingNumber,
+			shippingCarrierCode, shippedDate, lineItems). Empty list on error.
+		"""
+		try:
+			url = f"{self.base_url}/sell/fulfillment/v1/order/{order_id}/shipping_fulfillment"
+			response = self._make_request("GET", url)
+
+			if response.status_code == 200:
+				data = response.json()
+				return data.get("fulfillments", [])
+			else:
+				self.log_error("get_shipping_fulfillments",
+							   f"Status {response.status_code}: {response.text[:200]}")
+				return []
+
+		except Exception as e:
+			self.log_error("get_shipping_fulfillments", str(e))
 			return []
 
 	def get_my_selling(self):

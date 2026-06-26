@@ -306,6 +306,8 @@ def process_cancellation(order_data, auto_process=False):
                 title="eBay Auto-Process Cancellation Error"
             )
 
+    _safe_update_so_refund_status(so_name, ebay_order_id)
+
     frappe.db.commit()
     return True
 
@@ -354,6 +356,30 @@ def process_refund(transaction, auto_process=False):
     if not so_name:
         log_sync_result("process_refund", "Warning",
                         f"No Sales Order found for eBay order {order_id}")
+        return False, False, False
+
+    # --- Deduplicate against a cancellation that already produced this refund ---
+    # process_cancellation creates an eBay Refund (refund_type "Cancellation Refund")
+    # with no ebay_refund_id. The Finances API later reports the same money as a
+    # REFUND transaction. Link the transaction to the existing record instead of
+    # creating a duplicate eBay Refund (and a second Credit Note / stock return).
+    existing_cancellation = frappe.db.get_value("eBay Refund", {
+        "ebay_order_id": order_id,
+        "refund_type": "Cancellation Refund",
+        "ebay_refund_id": ["in", ["", None]],
+    }, "name")
+    if existing_cancellation:
+        refund_doc = frappe.get_doc("eBay Refund", existing_cancellation)
+        refund_doc.ebay_refund_id = transaction_id
+        refund_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+        log_sync_result(
+            "process_refund", "Info",
+            f"Linked Finances refund {transaction_id} to existing cancellation "
+            f"refund for order {order_id} (no duplicate created)"
+        )
+        _safe_update_so_refund_status(so_name, order_id)
+        frappe.db.commit()
         return False, False, False
 
     # Extract refund details
@@ -417,6 +443,8 @@ def process_refund(transaction, auto_process=False):
                 message=f"Error auto-processing refund {transaction_id}: {str(e)}",
                 title="eBay Auto-Process Refund Error"
             )
+
+    _safe_update_so_refund_status(so_name, order_id)
 
     frappe.db.commit()
     return True, credit_note_created, return_dn_created
@@ -632,6 +660,61 @@ def create_return_delivery_note(refund_doc):
             title="eBay Return DN Creation Error"
         )
         return None
+
+
+def _safe_update_so_refund_status(so_name, ebay_order_id):
+    """Best-effort wrapper: never let a refund-summary update abort the caller.
+
+    The Sales Order summary fields are informational; if computing them fails we
+    log it and move on rather than rolling back the refund record we just made.
+    """
+    try:
+        update_sales_order_refund_status(so_name, ebay_order_id)
+    except Exception as e:
+        frappe.log_error(
+            message=f"Could not update SO refund status for {so_name}: {e}",
+            title="eBay Refund Status Update Error",
+        )
+
+
+def update_sales_order_refund_status(so_name, ebay_order_id):
+    """Aggregate all eBay Refund records for an order onto the Sales Order.
+
+    Writes the read-only custom fields ``ebay_refund_amount`` and
+    ``ebay_refund_status`` (None Refund / Partial Refund / Full Refund) so the
+    refund state is visible directly on the Sales Order, not only on the
+    separate eBay Refund records.
+
+    Args:
+        so_name: Sales Order name
+        ebay_order_id: The eBay order ID used to find related refunds
+    """
+    if not so_name:
+        return
+
+    refunds = frappe.get_all(
+        "eBay Refund",
+        filters={"ebay_order_id": ebay_order_id},
+        fields=["refund_amount"],
+    )
+    total_refunded = sum(flt(r.get("refund_amount")) for r in refunds)
+
+    grand_total = flt(frappe.db.get_value("Sales Order", so_name, "grand_total"))
+
+    if total_refunded <= 0:
+        status = "No Refund"
+    elif grand_total and total_refunded >= grand_total - 0.01:
+        status = "Full Refund"
+    else:
+        # Either a genuine partial refund, or grand_total is unknown so we
+        # cannot prove it is a full refund — treat as partial to stay safe.
+        status = "Partial Refund"
+
+    frappe.db.set_value("Sales Order", so_name, {
+        "ebay_refund_amount": total_refunded,
+        "ebay_refund_status": status,
+        "ebay_last_sync": now_datetime(),
+    }, update_modified=False)
 
 
 def log_sync_result(method, status, message, details=None):

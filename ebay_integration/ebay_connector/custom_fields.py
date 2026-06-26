@@ -72,6 +72,14 @@ def get_custom_fields():
 				"insert_after": "ebay_tracking_number",
 				"read_only": 1
 			},
+			{
+				"fieldname": "ebay_fulfillment_status",
+				"fieldtype": "Data",
+				"label": "eBay Fulfillment Status",
+				"insert_after": "ebay_shipping_service",
+				"read_only": 1,
+				"description": "eBay order fulfillment status (FULFILLED / IN_PROGRESS / NOT_STARTED)"
+			},
 			# Cancellation and Refund Tracking Fields
 			{
 				"fieldname": "ebay_refund_section",
@@ -112,10 +120,26 @@ def get_custom_fields():
 				"description": "Total amount refunded to the buyer"
 			},
 			{
+				"fieldname": "ebay_selling_fee",
+				"fieldtype": "Currency",
+				"label": "eBay Selling Fee",
+				"insert_after": "ebay_refund_amount",
+				"read_only": 1,
+				"description": "eBay final-value/selling fee for this order (booked as an expense Journal Entry)"
+			},
+			{
+				"fieldname": "ebay_collected_tax",
+				"fieldtype": "Currency",
+				"label": "eBay Collected Tax (Informational)",
+				"insert_after": "ebay_selling_fee",
+				"read_only": 1,
+				"description": "Sales tax/VAT eBay collected and remitted on this order. Informational only — not part of the order total, since eBay (not you) remits it."
+			},
+			{
 				"fieldname": "ebay_last_sync",
 				"fieldtype": "Datetime",
 				"label": "Last Sync",
-				"insert_after": "ebay_refund_amount",
+				"insert_after": "ebay_collected_tax",
 				"read_only": 1,
 				"description": "Last time this order was synced with eBay"
 			}
@@ -182,13 +206,9 @@ def get_custom_fields():
 				"label": "Tax ID Type",
 				"insert_after": "ebay_username",
 				"description": "e.g., CURP, VAT, etc."
-			},
-			{
-				"fieldname": "tax_id",
-				"fieldtype": "Data",
-				"label": "Tax ID Value",
-				"insert_after": "tax_id_type"
 			}
+			# Note: 'tax_id' is a standard ERPNext Customer field, so no custom
+			# field is defined for it — import code writes to the standard field.
 		]
 	}
 

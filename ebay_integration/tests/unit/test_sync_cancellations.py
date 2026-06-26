@@ -19,6 +19,8 @@ from ebay_integration.utils.sync_cancellations import (
     map_cancellation_state,
     should_create_return_dn,
     process_cancellation,
+    process_refund,
+    update_sales_order_refund_status,
 )
 
 
@@ -433,3 +435,138 @@ class TestProcessCancellation:
         process_cancellation(order_data, auto_process=False)
 
         frappe_mock.db.commit.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# 5. process_refund — duplicate-refund prevention
+# ---------------------------------------------------------------------------
+
+def _make_refund_transaction(transaction_id="TXN-555", order_id="12-99999-00001",
+                             value="-45.00", memo="order cancel refund"):
+    """Build a minimal eBay Finances API refund transaction payload."""
+    return {
+        "transactionId": transaction_id,
+        "amount": {"value": value, "currency": "USD"},
+        "transactionDate": "2026-04-21T10:00:00.000Z",
+        "transactionMemo": memo,
+        "references": [{"referenceType": "ORDER_ID", "referenceId": order_id}],
+    }
+
+
+class TestProcessRefundDeduplication:
+    """The Finances refund and the Fulfillment cancellation describe the same
+    money for a cancelled order. process_refund must link them rather than
+    create a second eBay Refund record (and a second Credit Note)."""
+
+    def test_links_finances_refund_to_existing_cancellation(self, frappe_mock):
+        frappe_mock.db.exists.return_value = None  # transactionId not yet processed
+
+        def _get_value(doctype, filters, *args, **kwargs):
+            if doctype == "Sales Order":
+                return "SO-9999"
+            if doctype == "eBay Refund":
+                return "eBay-Refund-CANCEL-1"  # existing cancellation refund
+            return None
+
+        frappe_mock.db.get_value.side_effect = _get_value
+        frappe_mock.get_doc.reset_mock()
+
+        existing_doc = MagicMock(ebay_refund_id=None, save=MagicMock())
+        frappe_mock.get_doc.return_value = existing_doc
+
+        transaction = _make_refund_transaction()
+        processed, cn_created, rdn_created = process_refund(transaction, auto_process=True)
+
+        # No new eBay Refund dict should be created
+        new_refund_calls = [
+            c for c in frappe_mock.get_doc.call_args_list
+            if c.args and isinstance(c.args[0], dict)
+            and c.args[0].get("doctype") == "eBay Refund"
+        ]
+        assert new_refund_calls == [], "must not create a duplicate eBay Refund record"
+
+        # The existing cancellation record is linked to the Finances transaction
+        assert existing_doc.ebay_refund_id == "TXN-555"
+        existing_doc.save.assert_called_once_with(ignore_permissions=True)
+
+        # Nothing newly processed, no Credit Note / Return DN created
+        assert (processed, cn_created, rdn_created) == (False, False, False)
+
+    def test_creates_record_normally_when_no_cancellation_exists(self, frappe_mock):
+        frappe_mock.db.exists.return_value = None
+
+        def _get_value(doctype, filters, *args, **kwargs):
+            if doctype == "Sales Order":
+                return "SO-9999"
+            return None  # no existing cancellation refund
+
+        frappe_mock.db.get_value.side_effect = _get_value
+        frappe_mock.get_doc.reset_mock()
+
+        transaction = _make_refund_transaction(memo="partial refund")
+        processed, cn_created, rdn_created = process_refund(transaction, auto_process=False)
+
+        new_refund_calls = [
+            c for c in frappe_mock.get_doc.call_args_list
+            if c.args and isinstance(c.args[0], dict)
+            and c.args[0].get("doctype") == "eBay Refund"
+        ]
+        assert len(new_refund_calls) == 1, "should create the eBay Refund record normally"
+        assert processed is True
+
+
+# ---------------------------------------------------------------------------
+# 6. update_sales_order_refund_status
+# ---------------------------------------------------------------------------
+
+class TestUpdateSalesOrderRefundStatus:
+    """Aggregates eBay Refund records onto the Sales Order custom fields."""
+
+    def _set_grand_total(self, frappe_mock, total):
+        frappe_mock.db.get_value.return_value = total
+
+    def test_no_refunds_sets_no_refund_status_and_zero_amount(self, frappe_mock):
+        frappe_mock.get_all.return_value = []
+        self._set_grand_total(frappe_mock, 58.50)
+
+        update_sales_order_refund_status("SO-1", "12-1")
+
+        args = frappe_mock.db.set_value.call_args
+        assert args[0][0] == "Sales Order"
+        assert args[0][1] == "SO-1"
+        values = args[0][2]
+        assert values["ebay_refund_status"] == "No Refund"
+        assert values["ebay_refund_amount"] == 0
+
+    def test_partial_refund_status(self, frappe_mock):
+        frappe_mock.get_all.return_value = [{"refund_amount": 20.00}]
+        self._set_grand_total(frappe_mock, 58.50)
+
+        update_sales_order_refund_status("SO-2", "12-2")
+
+        values = frappe_mock.db.set_value.call_args[0][2]
+        assert values["ebay_refund_status"] == "Partial Refund"
+        assert values["ebay_refund_amount"] == 20.00
+
+    def test_full_refund_status_when_amount_meets_grand_total(self, frappe_mock):
+        frappe_mock.get_all.return_value = [
+            {"refund_amount": 50.00}, {"refund_amount": 8.50}
+        ]
+        self._set_grand_total(frappe_mock, 58.50)
+
+        update_sales_order_refund_status("SO-3", "12-3")
+
+        values = frappe_mock.db.set_value.call_args[0][2]
+        assert values["ebay_refund_status"] == "Full Refund"
+        assert values["ebay_refund_amount"] == 58.50
+
+    def test_full_refund_when_grand_total_unknown_but_refund_present(self, frappe_mock):
+        # grand_total None/0 should not crash; any refund counts as a refund
+        frappe_mock.get_all.return_value = [{"refund_amount": 10.00}]
+        self._set_grand_total(frappe_mock, None)
+
+        update_sales_order_refund_status("SO-4", "12-4")
+
+        values = frappe_mock.db.set_value.call_args[0][2]
+        assert values["ebay_refund_amount"] == 10.00
+        assert values["ebay_refund_status"] in ("Partial Refund", "Full Refund")

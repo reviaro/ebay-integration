@@ -298,21 +298,9 @@ def process_csv_row(row, company, update_existing=False):
 				"tax_amount": shipping
 			})
 
-	# eBay Collected Tax
-	if ebay_tax > 0:
-		tax_account = get_tax_account(company)
-		if tax_account:
-			desc_parts = ["eBay Collected Tax"]
-			if tax_type:
-				desc_parts.append(f"({tax_type})")
-			if tax_rate:
-				desc_parts.append(f"@ {tax_rate}%")
-			taxes.append({
-				"charge_type": "Actual",
-				"account_head": tax_account,
-				"description": " ".join(desc_parts),
-				"tax_amount": ebay_tax
-			})
+	# eBay Collected Tax (marketplace facilitator tax) is collected AND remitted
+	# by eBay — it is not the seller's liability, so it is NOT booked as a charge
+	# (that would overstate revenue/AR). Retained as an informational field below.
 
 	# Seller Collected Tax (separate from eBay collected)
 	if seller_tax > 0:
@@ -388,6 +376,10 @@ def process_csv_row(row, company, update_existing=False):
 	# Add customer note if present
 	if buyer_note:
 		so_data["instructions"] = buyer_note
+
+	# eBay-collected tax kept as informational only (not billed)
+	if ebay_tax > 0:
+		so_data["ebay_collected_tax"] = ebay_tax
 
 	if taxes:
 		so_data["taxes"] = taxes

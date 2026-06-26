@@ -531,10 +531,11 @@ class TestProcessOrder:
 
     # -- Taxes: eBay tax ---------------------------------------------------
 
-    def test_adds_ebay_tax_row_when_tax_positive(self, frappe_mock, sample_ebay_order):
-        """When ebay_tax > 0 and get_tax_account returns an account, a tax row
-        with 'eBay Collected Tax' description must be added."""
-        # sample_ebay_order has tax of "3.50"
+    def test_ebay_collected_tax_excluded_from_taxes_and_stored_as_info(
+            self, frappe_mock, sample_ebay_order):
+        """eBay marketplace-collected tax is remitted by eBay, so it must NOT be
+        booked as a Sales Order charge. It is stored on the informational
+        ebay_collected_tax field instead. sample_ebay_order has tax "3.50"."""
         frappe_mock.db.exists.return_value = None
         frappe_mock.db.get_single_value.return_value = "Test Company"
 
@@ -554,14 +555,14 @@ class TestProcessOrder:
             sync_orders_mod.process_order(sample_ebay_order)
 
         so_data = captured["data"]
-        assert "taxes" in so_data
+        # No eBay-collected tax row in the taxes table
         tax_rows = [
-            t for t in so_data["taxes"]
+            t for t in so_data.get("taxes", [])
             if "eBay Collected Tax" in t["description"]
         ]
-        assert len(tax_rows) == 1
-        assert tax_rows[0]["tax_amount"] == 3.5
-        assert tax_rows[0]["account_head"] == "Tax Payable - TC"
+        assert tax_rows == []
+        # Tax amount retained as informational field only
+        assert so_data.get("ebay_collected_tax") == 3.5
 
     def test_no_ebay_tax_row_when_tax_account_none(self, frappe_mock, sample_ebay_order):
         """If get_tax_account returns None, no tax row is added even if ebay_tax > 0."""
@@ -620,9 +621,9 @@ class TestProcessOrder:
 
     # -- Both shipping + tax together --------------------------------------
 
-    def test_adds_both_shipping_and_tax_rows(self, frappe_mock, sample_ebay_order):
-        """When both shipping and tax are present and accounts are returned,
-        both rows must appear in the taxes list."""
+    def test_shipping_billed_but_ebay_tax_excluded(self, frappe_mock, sample_ebay_order):
+        """Shipping is real revenue (billed). eBay-collected tax is excluded from
+        the taxes table and kept only as the informational field."""
         frappe_mock.db.exists.return_value = None
         frappe_mock.db.get_single_value.return_value = "Test Company"
 
@@ -643,10 +644,10 @@ class TestProcessOrder:
 
         so_data = captured["data"]
         assert "taxes" in so_data
-        assert len(so_data["taxes"]) == 2
         descriptions = {t["description"] for t in so_data["taxes"]}
         assert "eBay Shipping" in descriptions
-        assert "eBay Collected Tax (Sales Tax/VAT)" in descriptions
+        assert "eBay Collected Tax (Sales Tax/VAT)" not in descriptions
+        assert so_data.get("ebay_collected_tax") == 3.5
 
     # -- SO fields ---------------------------------------------------------
 
@@ -800,3 +801,168 @@ class TestProcessOrder:
             sync_orders_mod.process_order(sample_ebay_order)
 
         frappe_mock.db.commit.assert_called()
+
+
+# ===========================================================================
+# extract_shipping_info
+# ===========================================================================
+
+class TestExtractShippingInfo:
+    """Pulls shipping service + tracking number from a Fulfillment order payload."""
+
+    def test_returns_shipping_service_code(self):
+        order = {
+            "fulfillmentStartInstructions": [
+                {"shippingStep": {"shippingServiceCode": "USPSPriority"}}
+            ]
+        }
+        info = sync_orders_mod.extract_shipping_info(order)
+        assert info["shipping_service"] == "USPSPriority"
+
+    def test_returns_tracking_number_when_present(self):
+        order = {
+            "fulfillmentStartInstructions": [
+                {"shippingStep": {
+                    "shippingServiceCode": "USPSPriority",
+                    "shipmentTrackingNumber": "9400111899223817200000",
+                }}
+            ]
+        }
+        info = sync_orders_mod.extract_shipping_info(order)
+        assert info["tracking_number"] == "9400111899223817200000"
+
+    def test_missing_instructions_returns_none_values(self):
+        info = sync_orders_mod.extract_shipping_info({})
+        assert info == {"shipping_service": None, "tracking_number": None}
+
+    def test_empty_shipping_step_returns_none_values(self):
+        order = {"fulfillmentStartInstructions": [{"shippingStep": {}}]}
+        info = sync_orders_mod.extract_shipping_info(order)
+        assert info["shipping_service"] is None
+        assert info["tracking_number"] is None
+
+
+class TestProcessOrderSetsShippingFields:
+    """process_order must write shipping service / tracking onto the Sales Order."""
+
+    def test_sets_shipping_service_on_sales_order(self, frappe_mock, sample_ebay_order):
+        frappe_mock.db.exists.return_value = None
+        frappe_mock.db.get_single_value.return_value = "Test Company"
+        sample_ebay_order["fulfillmentStartInstructions"] = [
+            {"shippingStep": {"shippingServiceCode": "FedExHomeDelivery"}}
+        ]
+        mock_so = MagicMock(name="SO-TRACK")
+        mock_so.name = "SO-TRACK"
+        frappe_mock.get_doc.return_value = mock_so
+
+        with patch(f"{MODULE}.get_or_create_customer", return_value="CUST-1"), \
+             patch(f"{MODULE}.get_or_create_item", return_value="ITEM-1"), \
+             patch(f"{MODULE}.get_shipping_account", return_value=None), \
+             patch(f"{MODULE}.get_tax_account", return_value=None), \
+             patch(f"{MODULE}.create_invoice_and_payment"):
+            sync_orders_mod.process_order(sample_ebay_order)
+
+        shipping_calls = [
+            c for c in frappe_mock.db.set_value.call_args_list
+            if c.args[0] == "Sales Order"
+            and isinstance(c.args[2], dict)
+            and c.args[2].get("ebay_shipping_service") == "FedExHomeDelivery"
+        ]
+        assert len(shipping_calls) == 1
+
+    def test_fetches_tracking_for_fulfilled_order(self, frappe_mock, sample_ebay_order):
+        """A FULFILLED order with no tracking in the payload triggers an API fetch."""
+        frappe_mock.db.exists.return_value = None
+        frappe_mock.db.get_single_value.return_value = "Test Company"
+        sample_ebay_order["orderFulfillmentStatus"] = "FULFILLED"
+        sample_ebay_order["fulfillmentStartInstructions"] = [
+            {"shippingStep": {"shippingServiceCode": "USPSPriority"}}
+        ]
+        mock_so = MagicMock()
+        mock_so.name = "SO-FUL"
+        frappe_mock.get_doc.return_value = mock_so
+
+        with patch(f"{MODULE}.get_or_create_customer", return_value="CUST-1"), \
+             patch(f"{MODULE}.get_or_create_item", return_value="ITEM-1"), \
+             patch(f"{MODULE}.get_shipping_account", return_value=None), \
+             patch(f"{MODULE}.get_tax_account", return_value=None), \
+             patch(f"{MODULE}.create_invoice_and_payment"), \
+             patch(f"{MODULE}.fetch_tracking_for_order",
+                   return_value={"tracking_number": "1Z999", "shipping_service": "UPS"}) as mock_fetch:
+            sync_orders_mod.process_order(sample_ebay_order)
+
+        mock_fetch.assert_called_once_with("12-34567-89012")
+        tracking_calls = [
+            c for c in frappe_mock.db.set_value.call_args_list
+            if c.args[0] == "Sales Order"
+            and isinstance(c.args[2], dict)
+            and c.args[2].get("ebay_tracking_number") == "1Z999"
+        ]
+        assert len(tracking_calls) == 1
+
+    def test_no_tracking_fetch_when_not_fulfilled(self, frappe_mock, sample_ebay_order):
+        """An unshipped order must not make the extra tracking API call."""
+        frappe_mock.db.exists.return_value = None
+        frappe_mock.db.get_single_value.return_value = "Test Company"
+        sample_ebay_order["orderFulfillmentStatus"] = "IN_PROGRESS"
+        mock_so = MagicMock()
+        mock_so.name = "SO-INP"
+        frappe_mock.get_doc.return_value = mock_so
+
+        with patch(f"{MODULE}.get_or_create_customer", return_value="CUST-1"), \
+             patch(f"{MODULE}.get_or_create_item", return_value="ITEM-1"), \
+             patch(f"{MODULE}.get_shipping_account", return_value=None), \
+             patch(f"{MODULE}.get_tax_account", return_value=None), \
+             patch(f"{MODULE}.create_invoice_and_payment"), \
+             patch(f"{MODULE}.fetch_tracking_for_order") as mock_fetch:
+            sync_orders_mod.process_order(sample_ebay_order)
+
+        mock_fetch.assert_not_called()
+
+    def test_stores_fulfillment_status_on_sales_order(self, frappe_mock, sample_ebay_order):
+        """orderFulfillmentStatus is written to the SO even without shipping info."""
+        frappe_mock.db.exists.return_value = None
+        frappe_mock.db.get_single_value.return_value = "Test Company"
+        sample_ebay_order["orderFulfillmentStatus"] = "IN_PROGRESS"
+        sample_ebay_order.pop("fulfillmentStartInstructions", None)
+        mock_so = MagicMock()
+        mock_so.name = "SO-FS"
+        frappe_mock.get_doc.return_value = mock_so
+
+        with patch(f"{MODULE}.get_or_create_customer", return_value="CUST-1"), \
+             patch(f"{MODULE}.get_or_create_item", return_value="ITEM-1"), \
+             patch(f"{MODULE}.get_shipping_account", return_value=None), \
+             patch(f"{MODULE}.get_tax_account", return_value=None), \
+             patch(f"{MODULE}.create_invoice_and_payment"):
+            sync_orders_mod.process_order(sample_ebay_order)
+
+        status_calls = [
+            c for c in frappe_mock.db.set_value.call_args_list
+            if c.args[0] == "Sales Order"
+            and isinstance(c.args[2], dict)
+            and c.args[2].get("ebay_fulfillment_status") == "IN_PROGRESS"
+        ]
+        assert len(status_calls) == 1
+
+    def test_no_set_value_when_no_shipping_info(self, frappe_mock, sample_ebay_order):
+        frappe_mock.db.exists.return_value = None
+        frappe_mock.db.get_single_value.return_value = "Test Company"
+        sample_ebay_order.pop("fulfillmentStartInstructions", None)
+        mock_so = MagicMock()
+        mock_so.name = "SO-NONE"
+        frappe_mock.get_doc.return_value = mock_so
+
+        with patch(f"{MODULE}.get_or_create_customer", return_value="CUST-1"), \
+             patch(f"{MODULE}.get_or_create_item", return_value="ITEM-1"), \
+             patch(f"{MODULE}.get_shipping_account", return_value=None), \
+             patch(f"{MODULE}.get_tax_account", return_value=None), \
+             patch(f"{MODULE}.create_invoice_and_payment"):
+            sync_orders_mod.process_order(sample_ebay_order)
+
+        shipping_calls = [
+            c for c in frappe_mock.db.set_value.call_args_list
+            if c.args[0] == "Sales Order"
+            and isinstance(c.args[2], dict)
+            and ("ebay_shipping_service" in c.args[2] or "ebay_tracking_number" in c.args[2])
+        ]
+        assert shipping_calls == []
